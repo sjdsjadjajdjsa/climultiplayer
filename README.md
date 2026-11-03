@@ -133,11 +133,13 @@ tunnel exposes it with no account and no CORS. Files are copied to
 
 ## Harnesses
 
-The room image ships the four plan-based CLIs. Anything else comes from
-**Settings › tools**: Crush, OpenCode, Amp, Gemini CLI and Aider install into
-*your* home (`~/.npm-global` or `~/.local`), so the shared image stays small and
-you can add a tool without a rebuild. Only your own terminals see your installs.
-Anything needing an API key reads it from `~/.env` in your home. 
+The lean room image ships no agent CLIs; the full image bakes Claude Code,
+Codex, Grok and Copilot. Everything is also on offer in **Settings › tools**,
+which installs into *your* home (`~/.npm-global` or `~/.local`) rather than the
+shared image, so a lean room can still get any of them. The catalogue is Claude
+Code, Codex, Grok, Copilot, Crush, OpenCode, Amp, Gemini CLI and Aider. Only your
+own terminals see your installs, and anything needing an API key reads it from
+`~/.env` in your home.
 
 ## Room chat
 

@@ -4,8 +4,13 @@ import { containerName, ensureRoomContainer, useDocker } from './container.js'
 export type Tool = { id: string; name: string; kind: 'npm' | 'pip'; package: string; bin: string; note: string }
 
 // Optional harnesses, installed into the member's own home so the shared image
-// stays small. The four plan-based CLIs are baked instead.
+// stays small. The lean image ships none of them, and the full image bakes the
+// first four, so a lean room can still get them from here.
 export const TOOLS: Tool[] = [
+  { id: 'claude', name: 'Claude Code', kind: 'npm', package: '@anthropic-ai/claude-code', bin: 'claude', note: 'Anthropic plan sign-in' },
+  { id: 'codex', name: 'Codex', kind: 'npm', package: '@openai/codex', bin: 'codex', note: 'ChatGPT plan sign-in' },
+  { id: 'grok', name: 'Grok CLI', kind: 'npm', package: '@xai-official/grok', bin: 'grok', note: 'xAI plan sign-in' },
+  { id: 'copilot', name: 'GitHub Copilot', kind: 'npm', package: '@github/copilot', bin: 'copilot', note: 'GitHub account, device code' },
   { id: 'crush', name: 'Crush', kind: 'npm', package: '@charmland/crush', bin: 'crush', note: 'Charmbracelet agent, works with many providers' },
   { id: 'opencode', name: 'OpenCode', kind: 'npm', package: 'opencode-ai', bin: 'opencode', note: 'Provider agnostic coding agent' },
   { id: 'amp', name: 'Amp', kind: 'npm', package: '@sourcegraph/amp', bin: 'amp', note: 'Sourcegraph agent' },
