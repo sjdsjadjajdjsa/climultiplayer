@@ -1,0 +1,41 @@
+name: bug
+description: something broke or lied to me
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. `SECURITY.md` covers what the isolation does and
+        does not promise; use private reporting for anything sensitive.
+  - type: input
+    id: version
+    attributes:
+      label: version
+      description: commit or tag you ran
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: shell mode
+      description: the line the server printed at startup
+      options:
+        - container
+        - host process
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: what happened
+      description: smallest steps that show it, what you expected, what you got
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: terminal or console output
+      render: shell
+    validations:
+      required: false

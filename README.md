@@ -2,23 +2,52 @@
 
 ![ci](https://github.com/sjdsjadjajdjsa/climultiplayer/actions/workflows/ci.yml/badge.svg)
 
+**A live room where friends code together.** One shared copy of a project,
+everyone's own cursor and colour, a shared shell, and each person's own AI plan.
+
 ![three people in one room: two cursors in the same file, a shared shell, and a chat about the change](docs/room.png)
 
-Code on the same project with people anywhere, live. A room is a shared
-workspace: everyone sees the file tree, the same open file with their own cursor
-and colour, one shared terminal, and a chat assistant that proposes edits you
-apply with a click.
+- **Together, for real.** Cursors, selections and the open file are shared live.
+  Edits merge through a CRDT instead of fighting over one writer.
+- **A shell nobody has to trust.** Guests type into a shared shell that runs in a
+  throwaway container: read-only root, no capabilities, capped CPU, memory and
+  PIDs. The workspace is a copy, so your folder is never touched.
+- **Your plan, not the host's.** The assistant calls the subscription each person
+  already pays for. No API keys, no shared quota.
+- **Boring to set up.** One `npm start`, no account, nothing hosted for you.
+  Invites are single use, expiring and revocable, and every join is your call.
 
-The assistant runs on **each person's own AI subscription**. Nobody spends the
-host's quota and no API keys are needed.
+## Try it
 
-## Host it from your machine
+Needs Node 20+ and Docker.
+
+```bash
+git clone https://github.com/sjdsjadjajdjsa/climultiplayer
+cd climultiplayer
+npm install
+npm run room:image
+CLIMP_ROOM_NETWORK=host npm start
+```
+
+Open http://127.0.0.1:8787, pick a name, and click **or open a demo room** to look
+around on your own. `CLIMP_ROOM_NETWORK=host` is the sane default behind a VPN;
+drop it if docker's bridge works for you.
+
+## Contents
+
+[Try it](#try-it) · [Host it](#host-it-for-friends) · [Plans](#plans) ·
+[Terminals](#terminals) · [How it works](#how-it-works) ·
+[Security](#security-posture) · [Limits](#limits-of-the-base) ·
+[Configuration](#configuration) · [Tests](#tests)
+
+## Host it for friends
 
 One person hosts. Their machine runs the server and holds the workspace; friends
 join over the network. Nobody needs an account and nothing is hosted for you.
 
+One command past the steps above:
+
 ```bash
-npm install
 npm run host
 ```
 
@@ -39,8 +68,11 @@ repository so `git status` and `git log` work in the room, but a history over
 No friend around? "open a demo room" drops a small project in the room so you can
 try cursors, the shell and the assistant on your own.
 
+![the landing page: start a room, join with an invite, or open a demo](docs/landing.png)
+
 A friend who opens the link lands on the join screen with the room already known
-from the link (no code to type), gets a name prompt, and waits. You get a queue entry and click allow. The invite token sits after the
+from the link (no code to type), gets a name prompt, and waits. Their request
+arrives as a card you allow or deny. The invite token sits after the
 `#` in the link, so it never reaches the server in a request line and never
 leaks through a referrer. It is stored hashed, expires (1 hour, 24 hours or 7
 days), and can be revoked from the invite panel. A bare room code also works as
@@ -120,13 +152,15 @@ and **assistant**, the AI. Room chat is the default tab.
 
 ## Terminals
 
+![the terminal stage: a shared shell with a passing test run, and a member's own terminal being watched](docs/terminals.png)
+
 `terminal` summons a tilted stage of terminal cards. Two kinds:
 
 - **Shared** (dashed card): one command line per room, everyone types, each
   command shows who ran it. Risky commands here are held for the host.
 - **Per person**: `+ new` opens a full TTY card in the room container. You type,
   everyone else can click your card and watch live, read-only. This is where you
-  run `claude`, `codex`, `grok` or `copilot`, which the room image ships.
+  run `claude`, `codex`, `grok` or `copilot` from the full room image.
 
 Esc or `close` puts the stage away; the sessions keep running.
 
