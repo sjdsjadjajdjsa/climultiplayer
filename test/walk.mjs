@@ -5,6 +5,7 @@ import { mkdir as mkdirRecursive, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import { ready, startRoom } from './landing.mjs'
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-walk-'))
@@ -33,12 +34,10 @@ const shot = async name => {
 try {
   await mkdirRecursive(out, { recursive: true })
   await page.goto(base)
-  await page.waitForSelector('.shell-badge')
+  await ready(page)
   await shot('01-landing')
 
-  await page.fill('input[placeholder="alex"]', 'alex')
-  await page.fill('input[placeholder="/home/you/project"]', process.cwd())
-  await page.click('button:has-text("start room")')
+  await startRoom(page, 'alex', process.cwd())
   await page.waitForSelector('.room-code', { timeout: 40_000 })
   await shot('02-room-empty')
 

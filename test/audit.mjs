@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import { command, enterName, lastBad } from './landing.mjs'
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-audit-'))
@@ -22,13 +23,14 @@ const results = []
 const check = (name, ok, detail = '') => { results.push({ name, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ' :: ' + detail : ''}`) }
 
 await page.goto(base)
-await page.fill('input[placeholder="alex"]', 'alex')
-await page.fill('input[placeholder="/home/you/project"]', '/definitely/missing')
-await page.click('button:has-text("start room")')
-await page.waitForSelector('.error')
-check('a bad folder path explains itself', (await page.textContent('.error')).includes('no folder at'))
-await page.fill('input[placeholder="/home/you/project"]', '')
-await page.click('button:has-text("start room")')
+await enterName(page, 'alex')
+await command(page, 'start /definitely/missing')
+await page.waitForSelector('.term-line.bad:has-text("no folder at")')
+check('a bad folder path explains itself', (await lastBad(page)).includes('no folder at'))
+await command(page, 'nonsense')
+await page.waitForSelector('.term-line.bad:has-text("not a command")')
+check('an unknown command points at help', (await lastBad(page)).includes('help'))
+await command(page, 'start')
 await page.waitForSelector('.room-code')
 const openMenu = async () => page.click('.menu button.ghost')
 const closeMenu = async () => page.click('.menu-backdrop')

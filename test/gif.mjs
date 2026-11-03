@@ -6,6 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import { startRoom } from './landing.mjs'
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-gif-'))
@@ -29,9 +30,7 @@ const page = await context.newPage()
 
 try {
   await page.goto(base)
-  await page.fill('input[placeholder="alex"]', 'alex')
-  await page.fill('input[placeholder="/home/you/project"]', process.cwd())
-  await page.click('button:has-text("start room")')
+  await startRoom(page, 'alex', process.cwd())
   await page.waitForSelector('.room-code', { timeout: 40_000 })
   await page.waitForTimeout(800)
 

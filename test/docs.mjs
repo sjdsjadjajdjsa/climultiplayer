@@ -5,6 +5,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import { joinFromLink, ready, startRoom } from './landing.mjs'
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-docs-'))
@@ -63,21 +64,18 @@ const poster = async (page, text) => {
 
 try {
   await host.goto(base)
-  await host.waitForSelector('.shell-badge')
+  await ready(host)
+  await host.waitForTimeout(600)
   await host.screenshot({ path: 'docs/landing.png' })
 
-  await host.fill('input[placeholder="alex"]', 'alex')
-  await host.fill('input[placeholder="/home/you/project"]', process.cwd())
-  await host.click('button:has-text("start room")')
+  await startRoom(host, 'alex', process.cwd())
   await host.waitForSelector('.room-code', { timeout: 40_000 })
 
   for (const guest of people.slice(1)) {
     await host.click('.room-code')
     await host.waitForTimeout(400)
     const link = await host.evaluate(() => navigator.clipboard.readText())
-    await guest.page.goto(link)
-    await guest.page.fill('input[placeholder="alex"]', guest.name)
-    await guest.page.click('button:has-text("join with invite")')
+    await joinFromLink(guest.page, link, guest.name)
     await host.waitForSelector(`.notice.join:has-text("${guest.name}")`)
     await host.click(`.notice.join:has-text("${guest.name}") .notice-actions button`)
     await guest.page.waitForSelector('.room-code', { timeout: 20_000 })

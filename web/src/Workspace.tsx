@@ -288,7 +288,7 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
                   <button className="ghost" onClick={() => decideJoin(session, entry.id, false)}>deny</button>
                 </div>
               ) : (
-                <em className="notice-wait"><b /><b /><b /> waiting for the host</em>
+                <em className="notice-wait">waiting for the host</em>
               )}
             </article>
           ))}
@@ -310,7 +310,7 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
                   <button className="ghost" onClick={() => send({ type: 'approval', id: entry.id, allow: false })}>deny</button>
                 </div>
               ) : (
-                <em className="notice-wait"><b /><b /><b /> waiting for the host</em>
+                <em className="notice-wait">waiting for the host</em>
               )}
               <div className="notice-timer" style={{ animationDuration: `${APPROVAL_MS}ms` }} />
             </article>

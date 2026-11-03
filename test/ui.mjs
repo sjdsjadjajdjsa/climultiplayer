@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 import AxeBuilder from '@axe-core/playwright'
+import { enterName, joinFromLink, openDemo, ready, startRoom } from './landing.mjs'
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-ui-'))
@@ -49,9 +50,9 @@ for (const page of [host, guest]) page.on('pageerror', error => errors.push(erro
 
 try {
   await host.goto(base)
+  await ready(host)
   await audit(host, 'the landing page')
-  await host.fill('input[placeholder="alex"]', 'alex')
-  await host.click('button:has-text("start room")')
+  await startRoom(host, 'alex')
   await host.waitForSelector('.room-code')
   const code = (await host.textContent('.room-code')).trim().slice(0, 6)
 
@@ -61,13 +62,12 @@ try {
   check('an invite link is copied', link.includes(`#t=`), link.slice(0, 60))
 
   await guest.goto(link)
-  await guest.waitForSelector('.chip')
-  check('the link fills the room in for the guest', (await guest.textContent('.chip')).includes(code))
-  check('the code field is gone when a link is used', (await guest.locator('input.code-input').count()) === 0)
+  await ready(guest)
+  await guest.waitForSelector('.term-line:has-text("is in this link")')
+  check('the link names the room for the guest', (await guest.textContent('.term-body')).includes(code))
 
-  await guest.fill('input[placeholder="alex"]', 'sam')
-  await guest.click('button:has-text("join with invite")')
-  await guest.waitForSelector('.waiting')
+  await joinFromLink(guest, link, 'sam')
+  await guest.waitForSelector('.term-line:has-text("asking the host")')
   check('the guest waits instead of entering', true)
 
   await host.waitForSelector('.notice.join')
@@ -190,12 +190,11 @@ try {
   host.on('dialog', dialog => dialog.accept())
   await host.click('.menu button.ghost')
   await host.click('.menu-row:has-text("sam") button:text("remove")')
-  await guest.waitForSelector('.join-inner', { timeout: 6000 })
-  check('a kicked guest is put back on the landing page', (await guest.textContent('.join-inner')).includes('removed'))
+  await guest.waitForSelector('.term', { timeout: 6000 })
+  check('a kicked guest is put back on the landing page', (await guest.textContent('.term-body')).includes('removed'))
 
   // A visitor on their own should get something to poke at, not an empty tree.
-  await guest.fill('input[placeholder="alex"]', 'solo')
-  await guest.click('text=or open a demo room')
+  await openDemo(guest, 'solo')
   await guest.waitForSelector('.cm-line', { timeout: 20_000 })
   check('a demo room lands on the notes file', (await guest.locator('.file-tab').textContent()).includes('src/notes.md'))
   await audit(guest, 'a room')
