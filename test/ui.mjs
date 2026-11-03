@@ -96,6 +96,14 @@ try {
   check('typing syncs to the other browser', guestText.includes('hello from alex'), guestText.slice(0, 40))
   check('a remote cursor is drawn', (await guest.locator('.cm-ySelectionCaret').count()) > 0)
 
+  // The other direction, while both are connected: what the guest types has to
+  // reach the host without anyone reopening the file.
+  await guest.click('.cm-content')
+  await guest.keyboard.press('Control+End')
+  await guest.keyboard.type(' and sam')
+  await host.waitForFunction(() => document.querySelector('.cm-content')?.textContent?.includes('and sam'), null, { timeout: 6000 }).catch(() => {})
+  check('what a guest types reaches the host live', (await host.textContent('.cm-content')).includes('and sam'))
+
   await guest.click('button:text("terminal")')
   await guest.waitForSelector('.stage')
   await guest.fill('.card-input input', 'pwd')

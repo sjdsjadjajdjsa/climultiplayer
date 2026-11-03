@@ -15,7 +15,9 @@ const MESSAGE_AWARENESS = 1
 type DocSockets = {
   awareness: Awareness
   sockets: Set<WebSocket>
+  doc: DocEntry['doc']
   onAwareness: (event: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => void
+  onDoc: (update: Uint8Array, origin: unknown) => void
 }
 
 const byFile = new Map<string, DocSockets>()
@@ -26,7 +28,7 @@ const getSockets = (code: string, path: string, entry: DocEntry): DocSockets => 
   const id = key(code, path)
   const found = byFile.get(id)
   if (found) return found
-  const created: DocSockets = { awareness: new Awareness(entry.doc), sockets: new Set(), onAwareness: () => {} }
+  const created: DocSockets = { awareness: new Awareness(entry.doc), sockets: new Set(), doc: entry.doc, onAwareness: () => {}, onDoc: () => {} }
   created.onAwareness = (event, origin) => {
     const changed = [...event.added, ...event.updated, ...event.removed]
     if (!changed.length || origin === 'local') return
@@ -36,6 +38,18 @@ const getSockets = (code: string, path: string, entry: DocEntry): DocSockets => 
     broadcast(created.sockets, encoder)
   }
   created.awareness.on('update', created.onAwareness)
+  // The sync protocol only answers the sender, so an edit made by one person
+  // never reached anyone else until they reopened the file. Every change to the
+  // document, from a socket or from the server itself (applied assistant edits),
+  // is relayed to the other people looking at it.
+  created.onDoc = (update, origin) => {
+    const encoder = encoding.createEncoder()
+    encoding.writeVarUint(encoder, MESSAGE_SYNC)
+    syncProtocol.writeUpdate(encoder, update)
+    const payload = encoding.toUint8Array(encoder)
+    for (const socket of created.sockets) if (socket !== origin && socket.readyState === socket.OPEN) socket.send(payload)
+  }
+  entry.doc.on('update', created.onDoc)
   byFile.set(id, created)
   return created
 }
@@ -55,6 +69,7 @@ const releaseSockets = (code: string, path: string) => {
   if (!state) return
   if (state.sockets.size === 0) {
     state.awareness.off('update', state.onAwareness)
+    state.doc.off('update', state.onDoc)
     state.awareness.destroy()
     byFile.delete(id)
   }
@@ -83,14 +98,24 @@ export const docRoutes = (app: FastifyInstance) => {
     }
 
     ;(socket as any).__member = String((req.query as Record<string, string>)?.member ?? '') || token
+    // A client greets the server the moment the socket opens, which can be before
+    // the document has loaded. Those first frames are held, not dropped; a lost
+    // greeting means the client never finishes syncing.
+    let handle: ((data: Uint8Array) => void) | null = null
+    const early: Uint8Array[] = []
+    socket.on('message', (data: Uint8Array) => (handle ? handle(data) : early.push(data)))
     const entry = await acquireDoc(room.code, room.workspace, path)
+    if (socket.readyState !== socket.OPEN) {
+      releaseDoc(room.code, path)
+      return
+    }
     const state = getSockets(room.code, path, entry)
     state.sockets.add(socket)
     // Awareness client ids this socket introduced, so its cursors can be
     // cleared for everyone when it disconnects.
     const owned = new Set<number>()
 
-    socket.on('message', (data: Uint8Array) => {
+    handle = (data: Uint8Array) => {
       try {
         const decoder = decoding.createDecoder(new Uint8Array(data))
         const type = decoding.readVarUint(decoder)
@@ -116,7 +141,7 @@ export const docRoutes = (app: FastifyInstance) => {
       } catch {
         // A malformed frame from one client must not drop the socket.
       }
-    })
+    }
 
     socket.on('close', () => {
       state.sockets.delete(socket)
@@ -135,6 +160,7 @@ export const docRoutes = (app: FastifyInstance) => {
     encoding.writeVarUint(step1, MESSAGE_SYNC)
     syncProtocol.writeSyncStep1(step1, entry.doc)
     send(socket, step1)
+    for (const data of early.splice(0)) handle(data)
 
     const states = state.awareness.getStates()
     if (states.size) {
@@ -164,6 +190,7 @@ export const closeFileSockets = (code: string, path: string) => {
   for (const socket of state.sockets) socket.close(4000, 'file removed')
   state.sockets.clear()
   state.awareness.off('update', state.onAwareness)
+  state.doc.off('update', state.onDoc)
   state.awareness.destroy()
   byFile.delete(id)
 }
