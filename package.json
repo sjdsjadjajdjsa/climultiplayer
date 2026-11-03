@@ -20,7 +20,8 @@
     "docs:shots": "npm run build && node test/docs.mjs",
     "tunnel": "npm run build && node scripts/tunnel.mjs",
     "room:image:full": "docker build --network host -f Dockerfile.room.full -t climultiplayer-room:full .",
-    "docs:gif": "npm run build && node test/gif.mjs"
+    "docs:gif": "npm run build && node test/gif.mjs",
+    "test:walk": "npm run build && node test/walk.mjs"
   },
   "engines": {
     "node": ">=20"
