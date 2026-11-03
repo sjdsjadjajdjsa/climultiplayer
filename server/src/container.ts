@@ -118,8 +118,11 @@ export const execPlan = (code: string, memberId: string, home: string) =>
     : { file: process.env.SHELL || '/bin/sh', args: ['-l'], mode: 'host' as const }
 
 // Where a container's preview port landed on the host, if it is published.
+// Bridge networking publishes it on a docker-picked loopback port; with host
+// networking the container already sits on the host's own port.
 export const publishedPort = async (code: string, owner: string, port: number) => {
   if (!useDocker()) return null
+  if (roomNetwork !== 'bridge') return port
   const result = await docker(['port', containerName(code, owner), `${port}/tcp`])
   if (result.code !== 0) return null
   for (const line of result.stdout.split('\n')) {

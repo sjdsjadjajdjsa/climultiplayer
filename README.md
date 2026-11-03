@@ -194,8 +194,10 @@ changes land. **link for a second user** copies a fresh sign-in link; paste it i
 a private window to be both users yourself.
 
 - The ports a preview may use are `CLIMP_PREVIEW_PORTS` (default
-  `3000,4173,5000,5173,8000,8080`). They are published to the host's loopback
-  only, so the gateway is the only way in.
+  `3000,4173,5000,5173,8000,8080`). With bridge networking docker publishes them
+  on the host's loopback only, so the gateway is the only way in. With host
+  networking they are simply the host's own ports, so two rooms cannot preview
+  the same port at once.
 - Previews are served by a gateway on `CLIMP_PREVIEW_PORT` (default the app port
   plus one). It is a separate origin from the room app, so the previewed code
   never runs where your room session lives, and the room cookie is stripped
@@ -205,6 +207,9 @@ a private window to be both users yourself.
   and the preview is still live. Removing someone shuts them out at once.
 - A preview stops when its owner or the host stops it, after
   `CLIMP_PREVIEW_HOURS` (default 3), or when the room ends.
+- The server refuses a preview whose port nothing answers on, and says to bind
+  the dev server to `0.0.0.0`. A server on `127.0.0.1` inside the container is
+  not reachable from the host.
 - `npm run tunnel` opens a second tunnel for previews. Previews need docker with
   bridge networking; with `docker compose` the server cannot reach the host's
   loopback, so previews are off there for now.
