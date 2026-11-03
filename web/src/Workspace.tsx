@@ -11,8 +11,14 @@ import { Settings, type SettingsTab } from './Settings'
 import { Terminals } from './Terminals'
 import { Tree } from './Tree'
 
-type Pending = { id: string; command: string; memberName: string; reasons: string[] }
+type Pending = { id: string; command: string; memberName: string; memberId: string; reasons: string[] }
 type Waiting = { id: string; name: string; expiresAt: number }
+
+// A command approval dies on its own after 90s, which the card shows as a
+// shrinking bar rather than a sentence nobody reads.
+const APPROVAL_MS = 90_000
+
+const initials = (name: string) => name.trim().slice(0, 2).toUpperCase()
 
 export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (reason?: string) => void }) => {
   const socket = useRef<WebSocket | null>(null)
@@ -33,9 +39,13 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
   const [showChat, setShowChat] = useState(true)
   const [showTerm, setShowTerm] = useState(false)
   const [connected, setConnected] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState<{ text: string; at: number } | null>(null)
   const [following, setFollowing] = useState<string | null>(null)
   const [shell, setShell] = useState('host')
+
+  // A toast is stamped so that repeating the same sentence still restarts the
+  // four second clock instead of leaving the old one on screen.
+  const flash = (text: string) => setToast({ text, at: Date.now() })
 
   const isHost = session.member.role === 'host'
   const canApprove = session.member.role !== 'guest'
@@ -88,7 +98,7 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
       }
       if (message.type === 'term:approval') setPending(current => [...current, message])
       if (message.type === 'term:decision') setPending(current => current.filter(entry => entry.id !== message.id))
-      if (message.type === 'notice') setToast(message.message)
+      if (message.type === 'notice') flash(message.message)
       if (message.type === 'kicked') onLeave('the host removed you from that room')
       for (const handler of handlers.current) handler(message)
     }
@@ -101,9 +111,17 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
 
   useEffect(() => {
     if (!toast) return
-    const timer = setTimeout(() => setToast(''), 4000)
+    const timer = setTimeout(() => setToast(null), 4000)
     return () => clearTimeout(timer)
   }, [toast])
+
+  useEffect(() => {
+    const previous = document.title
+    document.title = `${session.code} · climultiplayer`
+    return () => {
+      document.title = previous
+    }
+  }, [session.code])
 
   const currentRef = useRef<string | null>(null)
   const followingRef = useRef<string | null>(null)
@@ -138,9 +156,9 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
     const message = sameMachine ? `${note}, works on this machine only` : note
     try {
       await navigator.clipboard.writeText(`${base}${path}`)
-      setToast(message)
+      flash(message)
     } catch {
-      setToast(`${base}${path}`)
+      flash(`${base}${path}`)
     }
   }
 
@@ -149,7 +167,7 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
       const invite = await createInvite(session, minutes)
       await copyLink(invite.path, 'single-use invite copied')
     } catch (problem: any) {
-      setToast(problem.message)
+      flash(problem.message)
     }
   }
 
@@ -218,16 +236,16 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
             if (!confirm(`remove ${member.name}?`)) return
             try {
               const result = await kickMember(session, member.id)
-              setToast(`${result.name} removed`)
+              flash(`${result.name} removed`)
             } catch (problem: any) {
-              setToast(problem.message)
+              flash(problem.message)
             }
           }}
           onRole={member => async () => {
             try {
               await setRole(session, member.id, member.role === 'editor' ? 'guest' : 'editor')
             } catch (problem: any) {
-              setToast(problem.message)
+              flash(problem.message)
             }
           }}
           others={members.filter(member => member.id !== session.member.id)}
@@ -237,42 +255,46 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
       </header>
 
       {(waiting.length > 0 || pending.length > 0) && (
-        <div className="approvals">
+        <div className="notices" role="status" aria-live="polite">
           {waiting.map(entry => (
-            <div key={entry.id} className="approval join">
-              <span>
-                <strong>{entry.name}</strong> wants to join
-                <small>the invite is spent only if you allow</small>
-              </span>
+            <article key={entry.id} className="notice join">
+              <header>
+                <i className="notice-avatar" aria-hidden>{initials(entry.name)}</i>
+                <span><strong>{entry.name}</strong> wants to join</span>
+              </header>
+              <p className="notice-note">The invite is spent only if you allow.</p>
               {isHost ? (
-                <>
-                  <button onClick={() => decideJoin(session, entry.id, true)}>allow</button>
-                  <button className="ghost" onClick={() => decideJoin(session, entry.id, false)}>
-                    deny
-                  </button>
-                </>
+                <div className="notice-actions">
+                  <button onClick={() => decideJoin(session, entry.id, true)}>allow {entry.name}</button>
+                  <button className="ghost" onClick={() => decideJoin(session, entry.id, false)}>deny</button>
+                </div>
               ) : (
-                <em>waiting for the host</em>
+                <em className="notice-wait"><b /><b /><b /> waiting for the host</em>
               )}
-            </div>
+            </article>
           ))}
           {pending.map(entry => (
-            <div key={entry.id} className="approval">
-              <span>
-                <strong>{entry.memberName}</strong> wants to run <code>{entry.command}</code>
-                <small>{entry.reasons.join(', ')}</small>
-              </span>
+            <article key={entry.id} className="notice run">
+              <header>
+                <i className="notice-avatar" style={{ background: members.find(member => member.id === entry.memberId)?.color ?? 'var(--dim)' }} aria-hidden>
+                  {initials(entry.memberName)}
+                </i>
+                <span><strong>{entry.memberName}</strong> wants to run</span>
+              </header>
+              <code className="notice-command">{entry.command}</code>
+              <div className="notice-reasons">
+                {entry.reasons.map(reason => <span key={reason}>{reason}</span>)}
+              </div>
               {canApprove ? (
-                <>
+                <div className="notice-actions">
                   <button onClick={() => send({ type: 'approval', id: entry.id, allow: true })}>allow</button>
-                  <button className="ghost" onClick={() => send({ type: 'approval', id: entry.id, allow: false })}>
-                    deny
-                  </button>
-                </>
+                  <button className="ghost" onClick={() => send({ type: 'approval', id: entry.id, allow: false })}>deny</button>
+                </div>
               ) : (
-                <em>waiting for the host</em>
+                <em className="notice-wait"><b /><b /><b /> waiting for the host</em>
               )}
-            </div>
+              <div className="notice-timer" style={{ animationDuration: `${APPROVAL_MS}ms` }} />
+            </article>
           ))}
         </div>
       )}
@@ -317,12 +339,12 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
         )}
       </main>
 
-      {toast && <div className="toast">{toast}</div>}
-      {settings && <Settings session={session} tab={settings} onTab={setSettings} onClose={() => setSettings(null)} onNote={setToast} onChanged={refreshModels} />}
-      {invites && <Invites session={session} onClose={() => setInvites(false)} onCopied={setToast} />}
+      {toast && <div className="toast" key={toast.at}>{toast.text}</div>}
+      {settings && <Settings session={session} tab={settings} onTab={setSettings} onClose={() => setSettings(null)} onNote={flash} onChanged={refreshModels} />}
+      {invites && <Invites session={session} onClose={() => setInvites(false)} onCopied={flash} />}
       {log && <Audit session={session} onClose={() => setLog(false)} />}
 
-      {publish && <Publish session={session} onClose={() => setPublish(false)} onNote={setToast} />}
+      {publish && <Publish session={session} onClose={() => setPublish(false)} onNote={flash} />}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 # climultiplayer
 
-![a room: two members, one watching the other's agent run](docs/room.png)
+![three people in one room: two cursors in the same file, a shared shell, and a chat about the change](docs/room.png)
 
 Code on the same project with people anywhere, live. A room is a shared
 workspace: everyone sees the file tree, the same open file with their own cursor

@@ -108,6 +108,12 @@ export const Join = ({ onSession, notice = '' }: { onSession: (session: Session)
             cli<span>multiplayer</span>
           </h1>
           <p className="tag">One workspace, live. Friends in, cursors moving, terminal shared, your own AI plan on call.</p>
+          <ul className="pitch">
+            <li>one shared tree</li>
+            <li>everyone's own cursor</li>
+            <li>a guarded shell</li>
+            <li>your plan, not mine</li>
+          </ul>
         </header>
 
         <label>

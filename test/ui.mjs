@@ -61,9 +61,9 @@ try {
   await guest.waitForSelector('.waiting')
   check('the guest waits instead of entering', true)
 
-  await host.waitForSelector('.approval.join')
+  await host.waitForSelector('.notice.join')
   check('the host sees the join queue', true)
-  await host.click('.approval.join button:has-text("allow")')
+  await host.click('.notice.join button:has-text("allow")')
   await guest.waitForSelector('.app', { timeout: 8000 })
   check('allowing lets the guest in', true)
   await guest.waitForSelector('.person', { timeout: 4000 })
@@ -97,9 +97,9 @@ try {
 
   await guest.fill('.card-input input', 'rm -rf nothing-here')
   await guest.keyboard.press('Enter')
-  await host.waitForSelector('.approval:not(.join)', { timeout: 5000 })
+  await host.waitForSelector('.notice.run', { timeout: 5000 })
   check('a risky guest command asks the host', true)
-  await host.click('.approval:not(.join) button:has-text("deny")')
+  await host.click('.notice.run button:has-text("deny")')
   await guest.waitForTimeout(800)
   check('denying reports back to the guest', (await guest.textContent('.xterm-rows')).includes('denied'))
 
@@ -164,7 +164,7 @@ try {
   await guest.fill('.card-input input', 'rm -f also-nothing')
   await guest.keyboard.press('Enter')
   await guest.waitForTimeout(900)
-  check('an editor runs risky commands without asking', !(await host.isVisible('.approval:not(.join)')))
+  check('an editor runs risky commands without asking', !(await host.isVisible('.notice.run')))
 
   await host.click('.menu button.ghost')
   await host.click('.menu-sheet button:text("Command log")')
