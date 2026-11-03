@@ -15,13 +15,15 @@ export const shellPlan = (code: string): ShellPlan => {
 export const reapOrphanContainers = async (knownCodes: string[]) => {
   if (!useDocker()) return 0
   const { execFile } = await import('node:child_process')
-  const keep = new Set(knownCodes.map(containerName))
+  // Shared shells are climp-room-<code>, member ones climp-room-<code>-<member>.
+  const keep = new Set(knownCodes.map(code => containerName(code)))
+  const roomOf = (name: string) => name.slice(0, 'climp-room-'.length + 6)
   const names = await new Promise<string[]>((resolve) => {
-    execFile('docker', ['ps', '--filter', 'name=climp-room-', '--format', '{{.Names}}'], (error, stdout) => {
+    execFile('docker', ['ps', '-a', '--filter', 'name=climp-room-', '--format', '{{.Names}}'], (error, stdout) => {
       resolve(error ? [] : stdout.split('\n').map(line => line.trim()).filter(Boolean))
     })
   })
-  const orphans = names.filter(name => !keep.has(name))
+  const orphans = names.filter(name => !keep.has(roomOf(name)))
   for (const name of orphans) execFile('docker', ['rm', '-f', name], () => {})
   return orphans.length
 }

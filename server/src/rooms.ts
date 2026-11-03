@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { customAlphabet } from 'nanoid'
 import type { WebSocket } from 'ws'
 import { dataDir, roomIdleMinutes } from './config.js'
+import { dropStore } from './auth/registry.js'
+import { removeRoomContainer } from './container.js'
 
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const makeCode = customAlphabet(codeAlphabet, 6)
@@ -357,10 +359,18 @@ export const decideJoin = (room: Room, id: string, allow: boolean) => {
   return null
 }
 
+// Plan sign-ins are the member's own refresh tokens. They leave with the member
+// instead of sitting on the host's disk forever.
+export const forgetSignIns = async (memberId: string) => {
+  dropStore(memberId)
+  await rm(join(dataDir, 'auth', `${memberId.replace(/[^a-z0-9]/gi, '')}.json`), { force: true })
+}
+
 export const removeMember = async (room: Room, memberId: string) => {
   if (memberId === room.hostId) return null
   const member = room.members.get(memberId) ?? null
   room.members.delete(memberId)
+  if (member) await forgetSignIns(member.id)
   await persist()
   return member
 }
@@ -408,6 +418,8 @@ export const closeRoom = async (room: Room) => {
 // untouched.
 export const deleteRoom = async (room: Room) => {
   await closeRoom(room)
+  for (const member of room.members.values()) await forgetSignIns(member.id)
+  await removeRoomContainer(room.code).catch(() => {})
   await rm(join(dataDir, 'rooms', room.code), { recursive: true, force: true })
 }
 

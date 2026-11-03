@@ -1,5 +1,6 @@
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { join, relative, resolve, sep } from 'node:path'
+import { constants } from 'node:fs'
+import { lstat, mkdir, open, readdir, realpath, rm, stat } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { ignoredNames, ignoredSuffixes, maxFileBytes } from './config.js'
 
 export class WorkspaceError extends Error {
@@ -53,24 +54,70 @@ export const listTree = async (root: string, limit = 4000): Promise<TreeEntry[]>
   return entries
 }
 
-export const readWorkspaceFile = async (root: string, path: string) => {
+// Guests have a shell in the container, and the container writes into the same
+// folder the server reads. A symlink made in there (`ln -s ~/.ssh/id_ed25519 x`)
+// would otherwise be followed by the server, on the host, as the host user. So
+// every file call checks the real path stays inside the workspace and refuses
+// symlinks outright; the final open also refuses to follow one.
+const inside = (root: string, full: string) => full === root || full.startsWith(root + sep)
+
+const nearestExisting = async (path: string): Promise<string> => {
+  try {
+    return await realpath(path)
+  } catch {
+    const parent = dirname(path)
+    if (parent === path) throw new WorkspaceError('the path leaves the workspace')
+    return nearestExisting(parent)
+  }
+}
+
+export const resolveSafe = async (root: string, path: string, allowLink = false) => {
   const full = resolveInside(root, path)
+  const realRoot = await realpath(root)
+  // Every existing part of the path must resolve inside the workspace.
+  if (!inside(realRoot, await nearestExisting(dirname(full)))) throw new WorkspaceError('the path leaves the workspace')
+  const info = await lstat(full).catch(() => null)
+  if (info?.isSymbolicLink()) {
+    if (allowLink) return full
+    throw new WorkspaceError('links are not opened by the server', 403)
+  }
+  if (info && !inside(realRoot, await realpath(full))) throw new WorkspaceError('the path leaves the workspace')
+  return full
+}
+
+const NOFOLLOW = constants.O_NOFOLLOW ?? 0
+
+export const readWorkspaceFile = async (root: string, path: string) => {
+  const full = await resolveSafe(root, path)
   const info = await stat(full).catch(() => null)
   if (!info?.isFile()) throw new WorkspaceError(`${path} does not exist`, 404)
   if (info.size > maxFileBytes) throw new WorkspaceError(`${path} is larger than ${maxFileBytes} bytes`, 413)
-  const buffer = await readFile(full)
-  return buffer.toString('utf8')
+  const handle = await open(full, constants.O_RDONLY | NOFOLLOW)
+  try {
+    const buffer = await handle.readFile()
+    return buffer.toString('utf8')
+  } finally {
+    await handle.close()
+  }
 }
 
 export const writeWorkspaceFile = async (root: string, path: string, text: string) => {
-  const full = resolveInside(root, path)
   if (Buffer.byteLength(text) > maxFileBytes) throw new WorkspaceError(`${path} is too large`, 413)
-  await mkdir(resolve(full, '..'), { recursive: true })
-  await writeFile(full, text)
+  const full = await resolveSafe(root, path)
+  await mkdir(dirname(full), { recursive: true })
+  // Checked again after mkdir: a folder could have been swapped for a link.
+  await resolveSafe(root, path)
+  const handle = await open(full, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | NOFOLLOW, 0o644)
+  try {
+    await handle.writeFile(text)
+  } finally {
+    await handle.close()
+  }
 }
 
 export const deleteWorkspacePath = async (root: string, path: string) => {
-  const full = resolveInside(root, path)
+  // A link itself may be removed (rm never follows the last part).
+  const full = await resolveSafe(root, path, true)
   if (full === root) throw new WorkspaceError('cannot delete the workspace root')
   await rm(full, { recursive: true, force: true })
 }

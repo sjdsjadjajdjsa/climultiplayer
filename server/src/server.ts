@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 import { host, lan, port, dataDir, roomNetwork, webDir } from './config.js'
 import { shareLinks } from './addresses.js'
 import { reapOrphanContainers, useDocker } from './shell.js'
-import { bridgeEgress, containerName, memberPath } from './container.js'
+import { bridgeEgress, memberPath, networkRefusal, removeMemberContainer } from './container.js'
 import { hasBin, installTool, TOOLS, toolById } from './tools.js'
 import { deletePage, listPages, publishPage, readPageFile } from './pages.js'
 import { clearedCookie, cookieHeader, cookieSession, requestToken } from './session.js'
@@ -78,6 +78,31 @@ const limited = (key: string, max = 10, windowMs = 60_000) => {
   return entry.count > max
 }
 
+// True only for a browser on this machine. A tunnel (cloudflared) also connects
+// from loopback, so any forwarding header means the request came from outside.
+const fromThisMachine = (req: any) => {
+  const address = String(req.socket?.remoteAddress ?? '')
+  const loopback = address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
+  const forwarded = ['x-forwarded-for', 'forwarded', 'cf-connecting-ip', 'x-real-ip', 'true-client-ip'].some(name => req.headers?.[name] !== undefined)
+  return loopback && !forwarded
+}
+
+// Another site (or a published page, whose origin is "null" once sandboxed)
+// must not drive the API or open a room socket with a visitor's cookie.
+const allowedOrigin = (req: any) => {
+  const origin = req.headers?.origin
+  if (origin === undefined) return true
+  let originHost = ''
+  try {
+    originHost = new URL(String(origin)).host.toLowerCase()
+  } catch {
+    return false
+  }
+  const extra = String(process.env.CLIMP_ORIGINS ?? '').split(',').map(entry => entry.trim().toLowerCase()).filter(Boolean)
+  const hosts = [req.headers?.host, req.headers?.['x-forwarded-host']].filter(Boolean).map((value: any) => String(value).split(',')[0].trim().toLowerCase())
+  return [...hosts, ...extra].includes(originHost)
+}
+
 const requireHost = (req: any, reply: any) => {
   const found = requireMember(req, reply)
   if (!found) return null
@@ -89,8 +114,19 @@ const requireHost = (req: any, reply: any) => {
 }
 
 export const buildServer = async () => {
-  const app = Fastify({ logger: false, bodyLimit: 4 * 1024 * 1024, trustProxy: true })
+  const app = Fastify({ logger: false, bodyLimit: 4 * 1024 * 1024, trustProxy: process.env.CLIMP_TRUST_PROXY === '1' })
   await mkdir(dataDir, { recursive: true })
+  app.addHook('onRequest', async (req, reply) => {
+    const upgrade = String(req.headers.upgrade ?? '').toLowerCase() === 'websocket'
+    if ((req.method !== 'GET' && req.method !== 'HEAD') || upgrade) {
+      if (!allowedOrigin(req)) return reply.code(403).send({ error: 'cross-site request refused' })
+    }
+  })
+  app.addHook('onSend', async (req, reply) => {
+    reply.header('x-content-type-options', 'nosniff')
+    reply.header('referrer-policy', 'no-referrer')
+    if (!req.url.startsWith('/p/')) reply.header('x-frame-options', 'DENY')
+  })
   await app.register(websocket, { options: { maxPayload: 8 * 1024 * 1024 } })
   docRoutes(app)
   controlRoutes(app)
@@ -98,7 +134,13 @@ export const buildServer = async () => {
   app.get('/api/health', async () => ({ ok: true, shell: useDocker() ? 'container' : 'host', network: useDocker() ? roomNetwork : 'host' }))
 
   app.post('/api/rooms', async (req, reply) => {
+    // Anyone who can reach the server could otherwise start a room, get a shell
+    // on this machine's docker, and copy any host folder (~/.ssh) in to read.
+    if (!fromThisMachine(req) && process.env.CLIMP_OPEN_ROOMS !== '1') {
+      return reply.code(403).send({ error: 'rooms can only be started on the host machine; ask the host for an invite' })
+    }
     const body = (req.body ?? {}) as { name?: string; source?: string; demo?: boolean }
+    if (body.source && !fromThisMachine(req)) return reply.code(403).send({ error: 'only the host machine can copy a folder in' })
     const source = body.source ? resolve(String(body.source).replace(/^~(?=\/|$)/, homedir())) : undefined
     if (source && !existsSync(source)) return reply.code(400).send({ error: `no folder at ${source}` })
     const { room, member } = await createRoom(body.name ?? 'host', source)
@@ -221,6 +263,7 @@ export const buildServer = async () => {
     if (!member) return reply.code(404).send({ error: 'no such member' })
     kickSockets(found.room, memberId)
     kickFileSockets(member.token)
+    void removeMemberContainer(found.room.code, memberId)
     broadcastJoins(found.room)
     return reply.send({ ok: true, name: member.name })
   })
@@ -240,6 +283,10 @@ export const buildServer = async () => {
       const file = await readPageFile(site, path)
       reply.header('content-type', file.type)
       reply.header('x-content-type-options', 'nosniff')
+      // Published pages share this origin with the room app. The sandbox gives
+      // them an opaque origin, so their scripts cannot call the API as whoever
+      // opened the page (the host, usually).
+      reply.header('content-security-policy', 'sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads')
       reply.header('cache-control', 'public, max-age=60')
       return reply.send(file.body)
     } catch {
@@ -258,7 +305,7 @@ export const buildServer = async () => {
     if (!found) return
     try {
       const body = (req.body ?? {}) as { name?: string; from?: string }
-      const source = body.from === 'workspace' ? found.room.workspace : String(body.from ?? found.room.workspace)
+      const source = found.room.workspace
       const page = await publishPage(String(body.name ?? ''), source)
       return reply.send(page)
     } catch (error) {
@@ -279,7 +326,9 @@ export const buildServer = async () => {
     if (!found) return
     await flushRoomDocs(found.room.code)
     const { spawn } = await import('node:child_process')
-    const tar = spawn('tar', ['-czf', '-', '-C', found.room.workspace, '.'])
+    // No .git: guests can write its config (core.fsmonitor, hooks, aliases),
+    // which would run on the host's machine the first time git looks at it.
+    const tar = spawn('tar', ['--exclude=./.git', '-czf', '-', '-C', found.room.workspace, '.'])
     reply.header('content-type', 'application/gzip')
     reply.header('content-disposition', `attachment; filename="${found.room.code}.tar.gz"`)
     return reply.send(tar.stdout)
@@ -454,6 +503,7 @@ export const startServer = async () => {
   if (!useDocker() && (host === '0.0.0.0' || host === '::')) {
     console.log('  warning: shells run as this user with no container. Guests can reach your home directory.')
   }
+  if (useDocker() && networkRefusal()) console.log(`  warning: ${networkRefusal()}\n  room shells will not start until that changes.`)
   if (useDocker()) {
     void bridgeEgress().then(ok => {
       if (!ok) console.log('  warning: room containers cannot reach the network over the docker bridge (a VPN often blocks it).\n  run with CLIMP_ROOM_NETWORK=host so installs and fetches work.')
