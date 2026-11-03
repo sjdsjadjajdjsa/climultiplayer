@@ -1,5 +1,7 @@
 # climultiplayer
 
+![ci](https://github.com/sjdsjadjajdjsa/climultiplayer/actions/workflows/ci.yml/badge.svg)
+
 ![three people in one room: two cursors in the same file, a shared shell, and a chat about the change](docs/room.png)
 
 Code on the same project with people anywhere, live. A room is a shared
