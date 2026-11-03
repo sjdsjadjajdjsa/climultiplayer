@@ -16,6 +16,7 @@ npm run test:audit         # builds, then screenshots every panel for inspection
 npm run room:image         # docker image the guest shell runs in
 npm run docs:shots         # regenerates the README screenshots
 npm run docs:gif           # re-records the README gif (needs docker and ffmpeg)
+npm run test:walk          # screenshots every surface, light and phone, into /tmp/climp-walk
 ```
 
 Tests force `CLIMP_SHELL=host` (see `server/test/setup.ts`): fast and
@@ -98,13 +99,20 @@ behaviour.
 - `CLIMP_ROOM_NETWORK=host` needs `CLIMP_ALLOW_HOST_NETWORK=1`; previews under
   host networking are the host's own ports, so one room per port.
 
-## Next, if you pick this up
+## Design state
 
-The landing page is the open design job. It currently breaks several rules in
-the author's reference library (`github.com/sjdsjadjajdjsa/web-refs`, read
-`briefs/banned.md` first): centred hero then two cards, pill chips, a glow,
-frosted header. The direction proposed and not started: make the page a
-terminal window after the Poolsuite idea (the desktop is the page), with the two
-actions as commands typed at a prompt and the pitch as shell comments. Keep the
-demo room reachable from it, and re-shoot `docs/landing.png` plus the README hero
-GIF afterwards with `npm run docs:shots` and `npm run docs:gif`.
+The reference rules live in `github.com/sjdsjadjajdjsa/web-refs` (`briefs/banned.md`).
+Done: the landing page is a terminal window on warm paper (`Join.tsx`, `.desk`
+and `.term` in `styles.css`), the room has a presence strip (colour bar, name,
+what each person is doing), terminals are flat dark windows, and the glow, glass
+header, pill chips, pulsing dots, uppercase kickers and global pill radius are
+gone. Fonts are self-hosted (Instrument Sans, Commit Mono) through fontsource.
+
+Still open: the room's `···` menu is long (settings, invites, publish, export, log,
+people, end, leave) and could be split by who needs it; the editor chrome and
+the assistant tab have had only a colour pass; dark mode has been checked by
+eye on the landing and not across every modal.
+
+Driving the landing in tests goes through `test/landing.mjs` (type a name, then a
+command). `npm run test:walk` shoots every surface plus a phone-width landing and
+room into `/tmp/climp-walk`.

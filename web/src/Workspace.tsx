@@ -21,6 +21,14 @@ const APPROVAL_MS = 90_000
 
 const initials = (name: string) => name.trim().slice(0, 2).toUpperCase()
 
+// What a person is up to, from the presence the room already shares.
+const doingOf = (member: Member) => {
+  if (!member.online) return 'away'
+  if (member.activity) return member.activity
+  if (member.file) return `in ${member.file.split('/').pop()}`
+  return 'here'
+}
+
 export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (reason?: string) => void }) => {
   const socket = useRef<WebSocket | null>(null)
   const handlers = useRef(new Set<(message: any) => void>())
@@ -39,7 +47,8 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
   const [publish, setPublish] = useState(false)
   const [previews, setPreviews] = useState<Preview[]>([])
   const [showPreviews, setShowPreviews] = useState(false)
-  const [showChat, setShowChat] = useState(true)
+  // The side panel is an overlay under 1080px, so it should not open over a phone.
+  const [showChat, setShowChat] = useState(() => window.innerWidth >= 1080)
   const [showTerm, setShowTerm] = useState(false)
   const [connected, setConnected] = useState(false)
   const [toast, setToast] = useState<{ text: string; at: number } | null>(null)
@@ -217,12 +226,15 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
             <button
               key={member.id}
               className={`person ${member.online ? 'on' : ''} ${following === member.id ? 'following' : ''}`}
+              style={{ '--c': member.color } as React.CSSProperties}
               onClick={() => setFollowing(following === member.id ? null : member.id)}
-              title={member.activity ?? member.name}
+              title={member.online ? 'click to follow their cursor' : 'not connected'}
             >
-              <i style={{ background: member.color }} />
-              <span>{member.id === session.member.id ? 'you' : member.name}</span>
-              {member.role !== 'guest' && <b>{member.role === 'host' ? 'host' : 'trusted'}</b>}
+              <span className="who">
+                {member.id === session.member.id ? 'you' : member.name}
+                {member.role !== 'guest' && <b>{member.role === 'host' ? 'host' : 'trusted'}</b>}
+              </span>
+              <span className="doing">{doingOf(member)}</span>
             </button>
           ))}
         </div>

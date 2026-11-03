@@ -8,7 +8,7 @@
 **A live room where friends code together.** One shared copy of a project,
 everyone's own cursor and colour, a shared shell, and each person's own AI plan.
 
-![a room in use: text landing under a live cursor, a chat message, then a command running in the shared shell](docs/room.gif)
+![typing a name and demo at the terminal landing, then editing a file, sending a chat message and running a command in the shared shell](docs/room.gif)
 
 - **Together, for real.** Cursors, selections and the open file are shared live.
   Edits merge through a CRDT instead of fighting over one writer.
@@ -32,8 +32,8 @@ npm run room:image
 CLIMP_ROOM_NETWORK=host CLIMP_ALLOW_HOST_NETWORK=1 npm start
 ```
 
-Open http://127.0.0.1:8787, pick a name, and click **or open a demo room** to look
-around on your own. Host networking is the sane default behind a VPN, but it
+Open http://127.0.0.1:8787, type a name at the prompt, then `demo` to look around
+on your own (or `start`, or click the word under the prompt). Host networking is the sane default behind a VPN, but it
 hands guests your loopback, so it needs the second flag; drop both if docker's
 bridge works for you.
 
@@ -69,13 +69,15 @@ room, your original is untouched. A small `.git` is copied out of a real
 repository so `git status` and `git log` work in the room, but a history over
 40 MB is skipped to keep the copy light.
 
-No friend around? "open a demo room" drops a small project in the room so you can
-try cursors, the shell and the assistant on your own.
+No friend around? `demo` drops a small project in the room so you can try cursors,
+the shell and the assistant on your own. The landing page takes `start [folder]`,
+`join <link or code>`, `demo`, `help`, `clear` and `cancel`, and each has a button.
 
-![the landing page: start a room, join with an invite, or open a demo](docs/landing.png)
+![the landing page is a terminal: type a name, then start, join or demo](docs/landing.png)
 
-A friend who opens the link lands on the join screen with the room already known
-from the link (no code to type), gets a name prompt, and waits. Their request
+A friend who opens the link lands on the same terminal, with the room already
+known from the link (no code to type). They type a name, press enter to use the
+invite, and wait. Their request
 arrives as a card you allow or deny. The invite token sits after the
 `#` in the link, so it never reaches the server in a request line and never
 leaks through a referrer. It is stored hashed, expires (1 hour, 24 hours or 7

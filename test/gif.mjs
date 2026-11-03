@@ -6,7 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
-import { startRoom } from './landing.mjs'
+import { ready } from './landing.mjs'
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-gif-'))
@@ -29,30 +29,36 @@ const context = await browser.newContext({
 const page = await context.newPage()
 
 try {
+  // Start at the terminal landing and type, so the clip shows how you get in.
   await page.goto(base)
-  await startRoom(page, 'alex', process.cwd())
-  await page.waitForSelector('.room-code', { timeout: 40_000 })
-  await page.waitForTimeout(800)
-
-  await page.click('.tree >> text=README.md')
-  await page.waitForSelector('.cm-line')
-  await page.waitForTimeout(600)
-  const line = await page.locator('.cm-line >> nth=5').boundingBox()
-  await page.mouse.click((line?.x ?? 260) + 8, (line?.y ?? 300) + 8)
-  await page.keyboard.type('Made together, in one tab. ')
+  await ready(page)
+  await page.waitForTimeout(900)
+  await page.type('.term-prompt input', 'alex', { delay: 110 })
+  await page.press('.term-prompt input', 'Enter')
+  await page.waitForSelector('.term-actions')
+  await page.waitForTimeout(700)
+  await page.type('.term-prompt input', 'demo', { delay: 110 })
+  await page.waitForTimeout(300)
+  await page.press('.term-prompt input', 'Enter')
+  await page.waitForSelector('.cm-line', { timeout: 40_000 })
   await page.waitForTimeout(900)
 
-  await page.fill('textarea[placeholder^="message the room"]', 'taking the intro, you do the shell')
+  // The demo opens its notes file; add a line at the end of it.
+  await page.click('.cm-line >> nth=2')
+  await page.keyboard.press('Control+End')
+  await page.keyboard.type('- [x] typed this in the room', { delay: 45 })
+  await page.waitForTimeout(700)
+
+  await page.fill('textarea[placeholder^="message the room"]', 'running the sample from the shell')
   await page.press('textarea[placeholder^="message the room"]', 'Enter')
   await page.waitForTimeout(700)
 
   await page.click('button[title="terminal"]')
   await page.waitForSelector('.card-term.shared')
-  await page.fill('input[placeholder="run a command everyone sees"]', 'git log --oneline -2')
-  await page.press('input[placeholder="run a command everyone sees"]', 'Enter')
-  await page.waitForTimeout(2600)
-  await page.click('.card-term.shared')
   await page.waitForTimeout(1200)
+  await page.type('input[placeholder="run a command everyone sees"]', 'node src/greeting.js alex', { delay: 55 })
+  await page.press('input[placeholder="run a command everyone sees"]', 'Enter')
+  await page.waitForTimeout(2800)
 } finally {
   await context.close()
   await browser.close()

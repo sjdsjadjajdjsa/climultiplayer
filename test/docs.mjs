@@ -1,7 +1,7 @@
 // Regenerates the README screenshots against a throwaway server and a room of
 // its own. Run with: npm run docs:shots.
 import { spawn } from 'node:child_process'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
@@ -27,7 +27,7 @@ for (const name of ['sam', 'robin']) {
 }
 
 const lastLine = (page) => page.evaluate(() => {
-  const rows = [...document.querySelectorAll('.xterm-rows > div')].map(row => (row.textContent ?? '')).filter(line => line.trim())
+  const rows = [...document.querySelectorAll('.card-term.shared .xterm-rows > div')].map(row => (row.textContent ?? '')).filter(line => line.trim())
   return rows.at(-1) ?? ''
 })
 
@@ -40,7 +40,7 @@ const waitChange = async (page, before, timeout = 20_000) => {
 }
 
 const idle = (page) => page.evaluate(() => {
-  const rows = [...document.querySelectorAll('.xterm-rows > div')].map(row => (row.textContent ?? '').trim()).filter(Boolean)
+  const rows = [...document.querySelectorAll('.card-term.shared .xterm-rows > div')].map(row => (row.textContent ?? '').trim()).filter(Boolean)
   return /node@room:\/workspace\$$/.test(rows.at(-1) ?? '')
 })
 
@@ -83,7 +83,7 @@ try {
 
   await people[1].page.click('button[title="terminal"]')
   await people[1].page.waitForSelector('.card-term.shared')
-  await people[1].page.fill('input[placeholder="run a command everyone sees"]', 'rm -rf dist && npm run build')
+  await people[1].page.fill('input[placeholder="run a command everyone sees"]', 'rm -rf build dist')
   await people[1].page.press('input[placeholder="run a command everyone sees"]', 'Enter')
   await host.waitForSelector('.notice.run', { timeout: 20_000 })
   await host.waitForTimeout(900)
@@ -143,7 +143,7 @@ try {
   await people[2].page.waitForTimeout(2500)
 
   await people[1].page.waitForTimeout(600)
-  for (const command of ['npm install --silent', 'npm test 2>&1 | tail -6']) {
+  for (const command of ['npm install --silent --no-audit --no-fund && echo installed', 'npx vitest run --root server test/risk.test.ts test/edits.test.ts 2>&1 | tail -7']) {
     const before = await lastLine(host)
     await host.fill('input[placeholder="run a command everyone sees"]', command)
     await host.press('input[placeholder="run a command everyone sees"]', 'Enter')

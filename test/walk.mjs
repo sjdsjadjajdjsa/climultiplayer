@@ -1,5 +1,6 @@
 // Opens every surface in one run and writes a screenshot per step, for eyeballing
-// a change across the whole app. Run with: npm run test:walk.
+// a change across the whole app. Run with: npm run test:walk (WALK_SCHEME=dark for
+// the dark theme, WALK_OUT to choose the folder).
 import { spawn } from 'node:child_process'
 import { mkdir as mkdirRecursive, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -21,7 +22,7 @@ for (let attempt = 0; attempt < 60; attempt++) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN ?? '/usr/bin/chromium', args: ['--no-sandbox'] })
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: process.env.WALK_SCHEME === 'dark' ? 'dark' : 'light' })
 await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base })
 const page = await context.newPage()
 const steps = []
@@ -68,6 +69,19 @@ try {
     if (await close.count()) await close.first().click()
     await page.waitForTimeout(300)
   }
+
+  // The same room on a phone: the landing, then the room itself.
+  const small = await browser.newContext({ viewport: { width: 390, height: 800 }, deviceScaleFactor: 2 })
+  const phone = await small.newPage()
+  await phone.goto(base)
+  await ready(phone)
+  await phone.waitForTimeout(500)
+  await phone.screenshot({ path: join(out, '11-phone-landing.png'), animations: 'disabled' })
+  await startRoom(phone, 'sam')
+  await phone.waitForSelector('.room-code', { timeout: 40_000 })
+  await phone.waitForTimeout(800)
+  await phone.screenshot({ path: join(out, '12-phone-room.png'), animations: 'disabled' })
+  steps.push('11-phone-landing', '12-phone-room')
   console.log(`wrote ${steps.length} shots to ${out}`)
 } catch (problem) {
   await page.screenshot({ path: join(out, '99-failure.png') })
