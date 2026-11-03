@@ -1,6 +1,6 @@
 name: idea
 description: something this should do
-labels: [idea]
+labels: [enhancement]
 body:
   - type: textarea
     id: problem
