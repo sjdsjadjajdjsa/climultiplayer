@@ -167,8 +167,9 @@ and **assistant**, the AI. Room chat is the default tab.
 
 - **Shared** (dashed card): one command line per room, everyone types, each
   command shows who ran it. Risky commands here are held for the host.
-- **Per person**: `+ new` opens a full TTY card in the room container. You type,
-  everyone else can click your card and watch live, read-only. This is where you
+- **Per person**: `+ new` opens a full TTY card in your own container (same
+  workspace, your own home). You type; the host can click your card and watch
+  live, read-only. This is where you
   run `claude`, `codex`, `grok` or `copilot` from the full room image.
 
 Esc or `close` puts the stage away; the sessions keep running.
@@ -181,6 +182,32 @@ Approvals live on the shared line only: a full-screen TUI redraws constantly, so
 gating keystrokes there is unreliable. Containerisation is the boundary for
 personal terminals, and `trust` promotes someone so their shared commands stop
 asking too.
+
+## Previews
+
+Run a dev server in your terminal, listening on all addresses
+(`npm run dev -- --host 0.0.0.0` for Vite), then hit **preview** and share its
+port. Everyone in the room gets a toast and can open it. Each browser signs in
+to the preview on its own, so two people are two users of the app at once: one
+logs in as the admin, the other as a customer, and you watch each other's
+changes land. **link for a second user** copies a fresh sign-in link; paste it in
+a private window to be both users yourself.
+
+- The ports a preview may use are `CLIMP_PREVIEW_PORTS` (default
+  `3000,4173,5000,5173,8000,8080`). They are published to the host's loopback
+  only, so the gateway is the only way in.
+- Previews are served by a gateway on `CLIMP_PREVIEW_PORT` (default the app port
+  plus one). It is a separate origin from the room app, so the previewed code
+  never runs where your room session lives, and the room cookie is stripped
+  before anything reaches the dev server.
+- Getting in takes a single-use link minted by the room for a member, good for
+  two minutes. Every request after that checks the member is still in the room
+  and the preview is still live. Removing someone shuts them out at once.
+- A preview stops when its owner or the host stops it, after
+  `CLIMP_PREVIEW_HOURS` (default 3), or when the room ends.
+- `npm run tunnel` opens a second tunnel for previews. Previews need docker with
+  bridge networking; with `docker compose` the server cannot reach the host's
+  loopback, so previews are off there for now.
 
 ## What a guest can do
 

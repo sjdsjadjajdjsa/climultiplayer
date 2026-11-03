@@ -55,6 +55,9 @@ const broadcastPresence = (room: Room) => broadcast(room, { type: 'presence', me
 // a reload.
 export const notifyTree = (room: Room) => broadcast(room, { type: 'tree' })
 
+// Previews changed: everyone's list updates, and the note says who shared what.
+export const notifyPreviews = (room: Room, previews: unknown[], note?: string) => broadcast(room, { type: 'previews', previews, note: note ?? null })
+
 // Roles live on the member pills, so a change has to reach everyone.
 export const refreshPresence = (room: Room) => broadcastPresence(room)
 

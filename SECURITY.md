@@ -51,6 +51,19 @@ startup banner says so.
 - Invite tokens are single use, expiring, revocable and stored hashed. Joining
   still needs the host to allow the request.
 
+## Previews
+
+- A preview is served by a separate gateway on its own port, which is its own
+  origin. The previewed app is code anyone in the room can write, so it never
+  runs on the room app's origin, and the room cookie and gateway cookie are
+  stripped from what reaches it. Two cookies with the room cookie's name are
+  treated as none, so a preview cannot plant one to pin a visitor's session.
+- Preview ports are published to `127.0.0.1` only. Getting through the gateway
+  takes a single-use, two minute ticket minted for a room member, traded for a
+  gateway cookie that is checked on every request against current membership.
+- What a preview shows is whatever the dev server serves. Treat it like any web
+  page a friend wrote: it can ask you for things.
+
 ## Reporting
 
 Open an issue with the version, the mode in the startup banner, and the smallest

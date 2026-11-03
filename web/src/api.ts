@@ -112,3 +112,16 @@ export const authAction = (session: Session, body: Record<string, unknown>) =>
   request('/api/auth', { method: 'POST', body: JSON.stringify(body) }) as Promise<any>
 
 export const wsUrl = (suffix: string) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${suffix}`
+
+export type Preview = { id: string; ownerId: string; ownerName: string; color: string; source: 'mine' | 'shared'; port: number; createdAt: number; expiresAt: number }
+
+export const listPreviews = (session: Session) => request(`/api/rooms/${session.code}/previews`) as Promise<{ previews: Preview[] }>
+
+export const startPreview = (session: Session, port: number, from: 'mine' | 'shared') =>
+  request(`/api/rooms/${session.code}/previews`, { method: 'POST', body: JSON.stringify({ port, from }) }) as Promise<{ id: string }>
+
+export const stopPreview = (session: Session, id: string) => request(`/api/rooms/${session.code}/previews/${id}`, { method: 'DELETE' })
+
+// A fresh single-use sign-in link for the preview gateway.
+export const previewLink = (session: Session, id: string) =>
+  request(`/api/rooms/${session.code}/previews/${id}/open`, { method: 'POST' }) as Promise<{ url: string }>
