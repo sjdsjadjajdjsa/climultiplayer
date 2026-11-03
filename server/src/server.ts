@@ -6,7 +6,7 @@ import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { host, lan, port, dataDir, roomNetwork, webDir } from './config.js'
+import { host, lan, port, dataDir, previewPort, roomNetwork, webDir } from './config.js'
 import { shareLinks } from './addresses.js'
 import { reapOrphanContainers, useDocker } from './shell.js'
 import { bridgeEgress, memberPath, networkRefusal, removeMemberContainer } from './container.js'
@@ -16,7 +16,8 @@ import { clearedCookie, cookieHeader, cookieSession, requestToken } from './sess
 import { storeFor } from './auth/registry.js'
 import { SUBSCRIPTIONS, subscriptionById } from './auth/subs.js'
 import { closeFileSockets, docRoutes, kickFileSockets } from './ws.js'
-import { broadcastJoins, closeControl, controlRoutes, kickSockets, notifyTree, refreshPresence } from './control.js'
+import { broadcastJoins, closeControl, controlRoutes, kickSockets, notifyPreviews, notifyTree, refreshPresence } from './control.js'
+import { findPreview, listPreviews, mintTicket, previewBase, startPreview, startPreviewGateway, stopMemberPreviews, stopPreview, stopRoomPreviews } from './previews.js'
 import {
   allMembers, allRooms, createInvite, createRoom, decideJoin, removeMember, seedDemo, setRole, deleteRoom, expireJoins, findByToken, findJoin, findMember, getRoom,
   hashToken, inviteLifetimeMinutes, loadRooms, publicInvite, publicRoom, requestJoin, revokeInvite, RoomError, sweepRooms,
@@ -244,6 +245,7 @@ export const buildServer = async () => {
   app.delete('/api/rooms/:code', async (req, reply) => {
     const found = requireHost(req, reply)
     if (!found) return
+    stopRoomPreviews(found.room.code)
     closeControl(found.room.code)
     await closeRoomDocs(found.room.code)
     await deleteRoom(found.room)
@@ -274,6 +276,8 @@ export const buildServer = async () => {
     kickSockets(found.room, memberId)
     kickFileSockets(member.token)
     void removeMemberContainer(found.room.code, memberId)
+    stopMemberPreviews(found.room.code, memberId)
+    notifyPreviews(found.room, listPreviews(found.room.code))
     broadcastJoins(found.room)
     return reply.send({ ok: true, name: member.name })
   })
@@ -330,6 +334,53 @@ export const buildServer = async () => {
     return reply.send({ ok: true })
   })
 
+  // Live previews. Any member can share a dev server from their own container
+  // (or the shared shell); any member can open one. The page itself is served
+  // by the preview gateway on its own port, never on this origin.
+  app.get('/api/rooms/:code/previews', async (req, reply) => {
+    const found = requireMember(req, reply)
+    if (!found) return
+    return reply.send({ previews: listPreviews(found.room.code) })
+  })
+
+  app.post('/api/rooms/:code/previews', async (req, reply) => {
+    const found = requireMember(req, reply)
+    if (!found) return
+    if (limited(`preview:${found.member.id}`, 12)) return reply.code(429).send({ error: 'too many previews started, wait a minute' })
+    try {
+      const body = (req.body ?? {}) as { port?: number; from?: string }
+      const source = body.from === 'shared' ? 'shared' : 'mine'
+      const preview = await startPreview(found.room, found.member, Number(body.port), source)
+      notifyPreviews(found.room, listPreviews(found.room.code), `${found.member.name} shared a preview on port ${preview.port}`)
+      return reply.send({ id: preview.id })
+    } catch (error) {
+      return fail(reply, error)
+    }
+  })
+
+  app.delete('/api/rooms/:code/previews/:id', async (req, reply) => {
+    const found = requireMember(req, reply)
+    if (!found) return
+    const preview = findPreview(found.room.code, String((req.params as any).id ?? ''))
+    if (!preview) return reply.code(404).send({ error: 'no such preview' })
+    if (preview.ownerId !== found.member.id && found.member.role !== 'host') return reply.code(403).send({ error: 'only its owner or the host can stop a preview' })
+    stopPreview(preview.id)
+    notifyPreviews(found.room, listPreviews(found.room.code))
+    return reply.send({ ok: true })
+  })
+
+  // A single-use link, good for two minutes. Opening it in another browser
+  // profile is how one person tests as a second user.
+  app.post('/api/rooms/:code/previews/:id/open', async (req, reply) => {
+    const found = requireMember(req, reply)
+    if (!found) return
+    const preview = findPreview(found.room.code, String((req.params as any).id ?? ''))
+    if (!preview) return reply.code(404).send({ error: 'that preview has stopped' })
+    const ticket = mintTicket(preview, found.member)
+    reply.header('cache-control', 'no-store')
+    return reply.send({ url: `${previewBase(req, previewPort)}/__climp/enter?t=${ticket}` })
+  })
+
   // Download the room as an archive before the room is ended.
   app.get('/api/rooms/:code/export', async (req, reply) => {
     const found = requireHost(req, reply)
@@ -351,6 +402,10 @@ export const buildServer = async () => {
     if (!found) return
     // A loopback bind means the LAN addresses have nothing listening, so say so
     // and let the client keep its own origin.
+    // Behind a tunnel the public address is the one to share; the host started
+    // the room on 127.0.0.1 (rooms can only be started on the host machine).
+    const publicUrl = String(process.env.CLIMP_PUBLIC_URL ?? '').replace(/\/+$/, '')
+    if (publicUrl) return reply.send({ code: found.room.code, local: false, links: [publicUrl] })
     const local = host === '127.0.0.1' || host === 'localhost' || host === '::1'
     return reply.send({ code: found.room.code, local, links: local ? [] : shareLinks(port) })
   })
@@ -509,6 +564,12 @@ export const startServer = async () => {
     })
   }
   await app.listen({ port, host })
+  try {
+    await startPreviewGateway(previewPort, host)
+    console.log(`previews on port ${previewPort} (room members only)`)
+  } catch (error: any) {
+    console.log(`  warning: previews are off, port ${previewPort} is not free (${error?.code ?? error?.message}). Set CLIMP_PREVIEW_PORT.`)
+  }
   console.log(`room shells: ${useDocker() ? 'container' : 'host process (docker not found, or CLIMP_SHELL=host)'}`)
   if (!useDocker() && (host === '0.0.0.0' || host === '::')) {
     console.log('  warning: shells run as this user with no container. Guests can reach your home directory.')

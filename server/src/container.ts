@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { dataDir, roomCpus, roomImage, roomMemory, roomNetwork, roomPids, shellMode } from './config.js'
+import { dataDir, previewPorts, roomCpus, roomImage, roomMemory, roomNetwork, roomPids, shellMode } from './config.js'
 
 // One container for the shared shell, and one per member for their own
 // terminals and tools. Members share the workspace, never a home: a home holds
@@ -66,6 +66,9 @@ export const containerRunArgs = (code: string, workspace: string, owner = 'share
   '--cap-drop', 'ALL',
   '--security-opt', 'no-new-privileges',
   ...(roomNetwork === 'bridge' ? [] : ['--network', roomNetwork]),
+  // Preview ports reach the host on loopback only, on a port docker picks; the
+  // preview gateway is the only way in from outside, and it checks membership.
+  ...(roomNetwork === 'bridge' ? previewPorts.flatMap(port => ['-p', `127.0.0.1::${port}`]) : []),
   '-v', `${workspace}:/workspace`,
   '-v', `${join(homesDir(code), safeOwner(owner))}:/homes/${safeOwner(owner)}`,
   '-w', '/workspace',
@@ -113,6 +116,21 @@ export const execPlan = (code: string, memberId: string, home: string) =>
         mode: 'container' as const,
       }
     : { file: process.env.SHELL || '/bin/sh', args: ['-l'], mode: 'host' as const }
+
+// Where a container's preview port landed on the host, if it is published.
+// Bridge networking publishes it on a docker-picked loopback port; with host
+// networking the container already sits on the host's own port.
+export const publishedPort = async (code: string, owner: string, port: number) => {
+  if (!useDocker()) return null
+  if (roomNetwork !== 'bridge') return port
+  const result = await docker(['port', containerName(code, owner), `${port}/tcp`])
+  if (result.code !== 0) return null
+  for (const line of result.stdout.split('\n')) {
+    const found = /^127\.0\.0\.1:(\d+)$/.exec(line.trim())
+    if (found) return Number(found[1])
+  }
+  return null
+}
 
 const roomContainers = async (code: string) => {
   const listed = await docker(['ps', '-a', '--filter', `name=^${containerName(code)}`, '--format', '{{.Names}}'])

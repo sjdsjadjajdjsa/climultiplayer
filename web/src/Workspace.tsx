@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  auditLog, createFile, createInvite, decideJoin, deleteFile, endRoom, exportUrl, installTool, inviteBase, kickMember, leaveRoom, listInvites, revokeInvite, setKey, setRole, toolsList, tree as fetchTree, wsUrl, type AuditEntry, type Tool,
-  type Invite, type Member, type Session, type TreeEntry,
+  auditLog, createFile, createInvite, decideJoin, deleteFile, endRoom, exportUrl, installTool, inviteBase, kickMember, leaveRoom, listInvites, listPreviews, revokeInvite, setKey, setRole, toolsList, tree as fetchTree, wsUrl, type AuditEntry, type Tool,
+  type Invite, type Member, type Preview, type Session, type TreeEntry,
 } from './api'
 import { Rail } from './Rail'
 import type { ChatModel } from './Chat'
 import { Editor } from './Editor'
 import { Publish } from './Publish'
+import { PreviewPanel } from './Preview'
 import { Settings, type SettingsTab } from './Settings'
 import { Terminals } from './Terminals'
 import { Tree } from './Tree'
@@ -36,6 +37,8 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
   const [log, setLog] = useState(false)
 
   const [publish, setPublish] = useState(false)
+  const [previews, setPreviews] = useState<Preview[]>([])
+  const [showPreviews, setShowPreviews] = useState(false)
   const [showChat, setShowChat] = useState(true)
   const [showTerm, setShowTerm] = useState(false)
   const [connected, setConnected] = useState(false)
@@ -86,6 +89,10 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
         if (target?.file && target.file !== currentRef.current) open(target.file)
       }
       if (message.type === 'tree') void refreshTree()
+      if (message.type === 'previews') {
+        setPreviews(message.previews ?? [])
+        if (message.note) flash(message.note)
+      }
       if (message.type === 'join:queue') setWaiting(message.joins ?? [])
       if (message.type === 'hello') {
         setShell(message.shell ?? 'host')
@@ -103,6 +110,7 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
       for (const handler of handlers.current) handler(message)
     }
     void refreshTree()
+    listPreviews(session).then(result => setPreviews(result.previews)).catch(() => {})
     return () => {
       ws.close()
       socket.current = null
@@ -226,6 +234,9 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
         </button>
         <button className={showTerm ? 'ghost on' : 'ghost'} onClick={() => setShowTerm(value => !value)} title="terminal">
           terminal
+        </button>
+        <button className={showPreviews ? 'ghost on' : 'ghost'} onClick={() => setShowPreviews(true)} title="live previews of dev servers in the room">
+          {previews.length ? `previews ${previews.length}` : 'preview'}
         </button>
         <Menu
           isHost={isHost}
@@ -353,6 +364,7 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
       {log && <Audit session={session} onClose={() => setLog(false)} />}
 
       {publish && <Publish session={session} onClose={() => setPublish(false)} onNote={flash} />}
+      {showPreviews && <PreviewPanel session={session} previews={previews} onPreviews={setPreviews} onClose={() => setShowPreviews(false)} onNote={flash} />}
     </div>
   )
 }

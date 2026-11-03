@@ -28,3 +28,15 @@ export const roomMemory = process.env.CLIMP_ROOM_MEMORY ?? '1g'
 export const roomCpus = process.env.CLIMP_ROOM_CPUS ?? '1'
 export const roomNetwork = process.env.CLIMP_ROOM_NETWORK ?? 'bridge'
 export const roomPids = Number(process.env.CLIMP_ROOM_PIDS ?? 512)
+
+// Live previews: a member's dev server, inside their container, shown to the
+// room on a second port. A second port is a second origin, so the previewed app
+// cannot call this server's API with a visitor's session.
+export const previewPort = Number(process.env.CLIMP_PREVIEW_PORT ?? port + 1)
+export const previewPorts = String(process.env.CLIMP_PREVIEW_PORTS ?? '3000,4173,5000,5173,8000,8080')
+  .split(',')
+  .map(value => Number(value.trim()))
+  .filter(value => Number.isInteger(value) && value > 0 && value < 65536)
+// Behind a tunnel the preview gets its own public address (see scripts/tunnel.mjs).
+export const previewUrl = process.env.CLIMP_PREVIEW_URL ?? ''
+export const previewHours = Number(process.env.CLIMP_PREVIEW_HOURS ?? 3)
