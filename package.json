@@ -1,0 +1,28 @@
+{
+  "name": "climultiplayer",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace server",
+    "build": "npm run build --workspace web && npm run build --workspace server",
+    "start": "npm run build && node server/dist/server.js",
+    "test": "npm run test --workspace server",
+    "typecheck": "npm run typecheck --workspace server && npm run typecheck --workspace web",
+    "host": "npm run build && node server/dist/server.js --lan",
+    "room:image": "docker build -f Dockerfile.room -t climultiplayer-room:latest .",
+    "serve": "node server/dist/server.js",
+    "test:ui": "npm run build && node test/ui.mjs",
+    "test:audit": "npm run build && node test/audit.mjs",
+    "docs:shots": "npm run build && node test/docs.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  }
+}

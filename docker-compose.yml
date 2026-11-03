@@ -1,0 +1,27 @@
+services:
+  climultiplayer:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      HOST: 0.0.0.0
+      CLIMP_DATA: /data
+      CLIMP_ROOM_IDLE_MINUTES: "180"
+      CLIMP_SHELL: docker
+      CLIMP_ROOM_IMAGE: climultiplayer-room:latest
+    volumes:
+      - climp-data:/data
+      # rooms run their own throwaway containers, so the daemon socket is needed
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  room-image:
+    build:
+      context: .
+      dockerfile: Dockerfile.room
+      network: host
+    image: climultiplayer-room:latest
+    command: ["true"]
+
+volumes:
+  climp-data:
