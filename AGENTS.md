@@ -14,6 +14,7 @@ npm run dev                # server with tsx watch (web: npm run dev --workspace
 npm run test:ui            # builds, then playwright walks the real UI
 npm run test:audit         # builds, then screenshots every panel for inspection
 npm run room:image         # docker image the guest shell runs in
+npm run docs:shots         # regenerates the README screenshots
 ```
 
 Tests force `CLIMP_SHELL=host` (see `server/test/setup.ts`): fast and
@@ -54,6 +55,12 @@ behaviour.
   `no-new-privileges`, memory/CPU/PID caps, workspace and homes only. Global npm
   installs work because `npm_config_prefix` points into the member home; that is
   why the root stays read-only. `apt-get install` inside a room will fail.
+- **Seeding skips more than it copies.** `node_modules`, `dist`, caches and
+  similar stay behind, and `.git` rides along only under 40 MB. The original
+  folder is never written to.
+- **One shell per room, and it may still be booting.** `openTerminal` shares an
+  in-flight start between sockets and exposes `ready`; a command written before
+  the shell speaks is otherwise lost. Await `ready` before `runCommand`.
 - **Restart after `npm run build`.** `web/index.html` points at hashed bundles
   from `web/dist`, and `webDir` existence is checked at boot. A server started
   before a rebuild keeps serving the old asset map, so `/assets/*.js` returns

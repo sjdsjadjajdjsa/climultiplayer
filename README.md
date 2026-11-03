@@ -30,7 +30,9 @@ climultiplayer on http://127.0.0.1:8787 (local)
 Open the local URL, pick a name, start a room, then hit **invite** on the room
 code. That mints a single-use link and copies it; send it wherever. To start from
 an existing folder, put its path in "copy a folder in": it is copied into the
-room, your original is untouched.
+room, your original is untouched. A small `.git` is copied out of a real
+repository so `git status` and `git log` work in the room, but a history over
+40 MB is skipped to keep the copy light.
 
 A friend who opens the link lands on the join screen with the room already known
 from the link (no code to type), gets a name prompt, and waits. You get a queue entry and click allow. The invite token sits after the
