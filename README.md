@@ -184,6 +184,8 @@ until the host clicks allow. The host runs risky commands directly.
 
 ## How it works
 
+![diagram: browsers talk to one server over two sockets, the room copy and member homes sit in that process, the shell runs in a container beside it](docs/architecture.svg)
+
 | Piece | What it is |
 |---|---|
 | `server/src/ws.ts` | y-websocket compatible sync per file, over `y-protocols`, with awareness for cursors |

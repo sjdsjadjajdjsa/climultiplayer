@@ -5,12 +5,20 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import AxeBuilder from '@axe-core/playwright'
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-ui-'))
 const browserPath = process.env.CHROME_BIN ?? '/usr/bin/chromium'
 
 const checks = []
+// axe is noisy on purpose; only the levels that actually stop someone count.
+const audit = async (page, where) => {
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  const bad = violations.filter(entry => entry.impact === 'serious' || entry.impact === 'critical')
+  check(`${where} has no serious accessibility faults`, bad.length === 0, bad.map(entry => entry.id).join(', '))
+}
+
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok })
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` (${detail})` : ''}`)
@@ -41,6 +49,7 @@ for (const page of [host, guest]) page.on('pageerror', error => errors.push(erro
 
 try {
   await host.goto(base)
+  await audit(host, 'the landing page')
   await host.fill('input[placeholder="alex"]', 'alex')
   await host.click('button:has-text("start room")')
   await host.waitForSelector('.room-code')
@@ -189,6 +198,7 @@ try {
   await guest.click('text=or open a demo room')
   await guest.waitForSelector('.cm-line', { timeout: 20_000 })
   check('a demo room lands on the notes file', (await guest.locator('.file-tab').textContent()).includes('src/notes.md'))
+  await audit(guest, 'a room')
   check('no page errors', errors.length === 0, errors.join(' | ').slice(0, 120))
 } catch (problem) {
   check(`flow aborted: ${problem.message.slice(0, 100)}`, false)

@@ -52,6 +52,7 @@ export const Editor = ({ session, path, onSelection, onTyping }: { session: Sess
         doc: '',
         extensions: [
           basicSetup,
+          EditorView.contentAttributes.of({ 'aria-label': 'file contents' }),
           theme.of(themeFor(dark.matches)),
           language.of(languageFor(path)),
           yCollab(doc.getText('text'), provider.awareness, { undoManager: undo }),
