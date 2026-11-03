@@ -40,7 +40,7 @@ bridge works for you.
 ## Contents
 
 [Try it](#try-it) · [Host it](#host-it-for-friends) · [Plans](#plans) ·
-[Terminals](#terminals) · [How it works](#how-it-works) ·
+[Terminals](#terminals) · [Previews](#previews) · [How it works](#how-it-works) ·
 [Security](#security-posture) · [Limits](#limits-of-the-base) ·
 [Configuration](#configuration) · [Tests](#tests)
 

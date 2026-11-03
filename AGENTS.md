@@ -85,3 +85,26 @@ behaviour.
   same function that creates them; leaking one keeps a room container alive.
 - No comments restating the code. Comments explain the reason a thing is the way
   it is.
+
+## Where this is right now
+
+- `main` carries the security pass (per-member containers and homes, host-only
+  room creation, origin check, sandboxed pages, symlink refusal, owner-only
+  credential files) and live previews (a second gateway port with single-use
+  tickets, cookie stripping, membership checked per request).
+- Test commands run the container path when the image exists and fall back to a
+  host shell otherwise; `CLIMP_SHELL=docker` forces it in CI.
+- Shells need docker for guests. Host mode is host-only on purpose, not a bug.
+- `CLIMP_ROOM_NETWORK=host` needs `CLIMP_ALLOW_HOST_NETWORK=1`; previews under
+  host networking are the host's own ports, so one room per port.
+
+## Next, if you pick this up
+
+The landing page is the open design job. It currently breaks several rules in
+the author's reference library (`github.com/sjdsjadjajdjsa/web-refs`, read
+`briefs/banned.md` first): centred hero then two cards, pill chips, a glow,
+frosted header. The direction proposed and not started: make the page a
+terminal window after the Poolsuite idea (the desktop is the page), with the two
+actions as commands typed at a prompt and the pitch as shell comments. Keep the
+demo room reachable from it, and re-shoot `docs/landing.png` plus the README hero
+GIF afterwards with `npm run docs:shots` and `npm run docs:gif`.
