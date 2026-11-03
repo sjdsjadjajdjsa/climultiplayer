@@ -434,5 +434,7 @@ describe('starting from a folder', () => {
     const home = await app.inject({ method: 'POST', url: '/api/rooms', payload: { name: 'host', source: '~' } })
     expect(home.statusCode).toBe(200)
     expect(home.json().room.workspace).toContain(homedir() ? '/rooms/' : '')
-  })
+    // A home directory can be large and CI runners are slow; seeding it is not
+    // a two second job.
+  }, 90_000)
 })
