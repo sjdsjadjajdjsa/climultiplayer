@@ -6,6 +6,6 @@ export default defineConfig({
     setupFiles: ['./test/setup.ts'],
     include: ['test/**/*.test.ts'],
     testTimeout: 20_000,
-    pool: 'threads',
+    pool: 'forks',
   },
 })

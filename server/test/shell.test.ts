@@ -84,5 +84,7 @@ describe('shared terminal reuse', () => {
     expect(one).toBe(two)
     await one.ready
     term.closeTerminal('ROOM1')
+    // The pty is native: give it a beat to unwind before the worker exits.
+    await new Promise(resolve => setTimeout(resolve, 150))
   })
 })
