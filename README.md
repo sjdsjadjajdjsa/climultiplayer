@@ -1,6 +1,9 @@
 # climultiplayer
 
-![ci](https://github.com/sjdsjadjajdjsa/climultiplayer/actions/workflows/ci.yml/badge.svg)
+[![ci](https://img.shields.io/github/actions/workflow/status/sjdsjadjajdjsa/climultiplayer/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/sjdsjadjajdjsa/climultiplayer/actions/workflows/ci.yml)
+[![license](https://img.shields.io/github/license/sjdsjadjajdjsa/climultiplayer?style=flat-square&color=12915b)](LICENSE)
+[![node](https://img.shields.io/badge/node-20%2B-17181d?style=flat-square)](package.json)
+[![docker](https://img.shields.io/badge/shell-container-2f6bff?style=flat-square)](SECURITY.md)
 
 **A live room where friends code together.** One shared copy of a project,
 everyone's own cursor and colour, a shared shell, and each person's own AI plan.
@@ -295,3 +298,9 @@ a member terminal and home persistence.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+[Contributing](CONTRIBUTING.md) · [Security and threat model](SECURITY.md) ·
+[Code of conduct](CODE_OF_CONDUCT.md) · [How the pieces fit](AGENTS.md) ·
+[Changelog/releases](https://github.com/sjdsjadjajdjsa/climultiplayer/releases)
