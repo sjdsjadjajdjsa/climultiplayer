@@ -15,6 +15,7 @@ npm run test:ui            # builds, then playwright walks the real UI
 npm run test:audit         # builds, then screenshots every panel for inspection
 npm run room:image         # docker image the guest shell runs in
 npm run docs:shots         # regenerates the README screenshots
+npm run docs:gif           # re-records the README gif (needs docker and ffmpeg)
 ```
 
 Tests force `CLIMP_SHELL=host` (see `server/test/setup.ts`): fast and

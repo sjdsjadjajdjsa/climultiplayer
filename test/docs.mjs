@@ -119,7 +119,6 @@ try {
     if (log) log.scrollTop = log.scrollHeight
   })
   await host.waitForTimeout(300)
-  await host.screenshot({ path: 'docs/room.png' })
 
   await host.click('button[title="terminal"]')
   await people[1].page.click('button[title="terminal"]')
@@ -159,7 +158,7 @@ try {
   })
   await host.waitForTimeout(600)
   await host.screenshot({ path: 'docs/terminals.png' })
-  console.log('wrote docs/landing.png, docs/room.png, docs/terminals.png')
+  console.log('wrote docs/landing.png, docs/notice.png, docs/terminals.png')
 } finally {
   await browser.close()
   server.kill()

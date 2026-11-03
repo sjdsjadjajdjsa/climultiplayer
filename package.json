@@ -19,7 +19,8 @@
     "test:audit": "npm run build && node test/audit.mjs",
     "docs:shots": "npm run build && node test/docs.mjs",
     "tunnel": "npm run build && node scripts/tunnel.mjs",
-    "room:image:full": "docker build --network host -f Dockerfile.room.full -t climultiplayer-room:full ."
+    "room:image:full": "docker build --network host -f Dockerfile.room.full -t climultiplayer-room:full .",
+    "docs:gif": "npm run build && node test/gif.mjs"
   },
   "engines": {
     "node": ">=20"

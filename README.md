@@ -8,7 +8,7 @@
 **A live room where friends code together.** One shared copy of a project,
 everyone's own cursor and colour, a shared shell, and each person's own AI plan.
 
-![three people in one room: two cursors in the same file, a shared shell, and a chat about the change](docs/room.png)
+![a room in use: text landing under a live cursor, a chat message, then a command running in the shared shell](docs/room.gif)
 
 - **Together, for real.** Cursors, selections and the open file are shared live.
   Edits merge through a CRDT instead of fighting over one writer.
@@ -288,6 +288,9 @@ npm test          # server, rooms, invites, auth, sync, containment
 npm run test:ui   # real Chromium: two browsers through the whole join and edit path
 npm run test:audit # real Chromium: opens every panel and control, fails on any dead end
 ```
+
+`docs:shots` rewrites the screenshots and `docs:gif` re-records the clip at the
+top; both drive a real browser, and the GIF needs `ffmpeg` and ImageMagick.
 
 `test:ui` needs a Chromium binary (set `CHROME_BIN` if it is not at
 `/usr/bin/chromium`). It starts its own server on a random port and cleans up.
