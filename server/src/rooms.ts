@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { customAlphabet } from 'nanoid'
 import type { WebSocket } from 'ws'
 import { dataDir, roomIdleMinutes } from './config.js'
-import { dropStore } from './auth/registry.js'
+import { authFile, dropStore } from './auth/registry.js'
 import { removeRoomContainer } from './container.js'
 
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -363,7 +363,7 @@ export const decideJoin = (room: Room, id: string, allow: boolean) => {
 // instead of sitting on the host's disk forever.
 export const forgetSignIns = async (memberId: string) => {
   dropStore(memberId)
-  await rm(join(dataDir, 'auth', `${memberId.replace(/[^a-z0-9]/gi, '')}.json`), { force: true })
+  await rm(authFile(memberId), { force: true })
 }
 
 export const removeMember = async (room: Room, memberId: string) => {

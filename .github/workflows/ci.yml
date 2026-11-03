@@ -16,5 +16,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      # Guest shell behaviour is container behaviour, so the suite runs against
+      # the real image instead of falling back to the host shell.
+      - run: docker build -f Dockerfile.room -t climultiplayer-room:latest .
       - run: npm test
+        env:
+          CLIMP_SHELL: docker
+          CLIMP_ROOM_NETWORK: host
+          CLIMP_ALLOW_HOST_NETWORK: "1"
       - run: npm run build

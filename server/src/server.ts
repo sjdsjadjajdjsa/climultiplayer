@@ -156,7 +156,17 @@ export const buildServer = async () => {
     return reply.send({ code: found.room.code, member: { ...found.member, online: true } })
   })
 
-  app.post('/api/leave', async (_req, reply) => {
+  app.post('/api/leave', async (req, reply) => {
+    // Leaving ends the membership, so the member's plan tokens and their
+    // container go with them. The host keeps the room, so only the cookie is
+    // cleared there.
+    const found = memberOf(req)
+    if (found && found.member.role !== 'host') {
+      await removeMember(found.room, found.member.id)
+      void removeMemberContainer(found.room.code, found.member.id)
+      broadcastJoins(found.room)
+      refreshPresence(found.room)
+    }
     clearSession(reply)
     return reply.send({ ok: true })
   })

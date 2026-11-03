@@ -10,7 +10,7 @@ import { chromium } from 'playwright'
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-gif-'))
 const server = spawn('node', ['server/dist/server.js'], {
-  env: { ...process.env, CLIMP_DATA: data, PORT: String(port), CLIMP_SHELL: 'docker', CLIMP_ROOM_NETWORK: 'host' },
+  env: { ...process.env, CLIMP_DATA: data, PORT: String(port), CLIMP_SHELL: 'docker', CLIMP_ROOM_NETWORK: 'host', CLIMP_ALLOW_HOST_NETWORK: '1' },
   stdio: 'ignore',
 })
 
