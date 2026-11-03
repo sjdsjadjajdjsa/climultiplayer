@@ -17,6 +17,7 @@ npm run room:image         # docker image the guest shell runs in
 npm run docs:shots         # regenerates the README screenshots
 npm run docs:gif           # re-records the README gif (needs docker and ffmpeg)
 npm run test:walk          # screenshots every surface, light and phone, into /tmp/climp-walk
+npm run docs:social        # re-renders .github/social-preview.png from the landing page
 ```
 
 Tests force `CLIMP_SHELL=host` (see `server/test/setup.ts`): fast and

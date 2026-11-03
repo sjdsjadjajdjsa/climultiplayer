@@ -21,7 +21,8 @@
     "tunnel": "npm run build && node scripts/tunnel.mjs",
     "room:image:full": "docker build --network host -f Dockerfile.room.full -t climultiplayer-room:full .",
     "docs:gif": "npm run build && node test/gif.mjs",
-    "test:walk": "npm run build && node test/walk.mjs"
+    "test:walk": "npm run build && node test/walk.mjs",
+    "docs:social": "npm run build && node test/social.mjs"
   },
   "engines": {
     "node": ">=20"
