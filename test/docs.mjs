@@ -162,4 +162,6 @@ try {
 } finally {
   await browser.close()
   server.kill()
+  // Each run seeds a full copy of the repo; leaving it in tmp fills the disk.
+  await rm(data, { recursive: true, force: true })
 }
