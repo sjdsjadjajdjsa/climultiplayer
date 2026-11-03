@@ -8,7 +8,7 @@
 **A live room where friends code together.** One shared copy of a project,
 everyone's own cursor and colour, a shared shell, and each person's own AI plan.
 
-![typing a name and demo at the terminal landing, then editing a file, sending a chat message and running a command in the shared shell](docs/room.gif)
+![three people in one room: two invites arrive as cards, everyone edits one file at the same moment with their own cursor, they chat, and a risky command waits for the host before it runs](docs/room.gif)
 
 - **Together, for real.** Cursors, selections and the open file are shared live.
   Edits merge through a CRDT instead of fighting over one writer.

@@ -108,7 +108,7 @@ try {
   await page.waitForTimeout(900)
   for (const guest of Object.values(people)) await guest.page.click('button[title="terminal"]')
   const line = 'input[placeholder="run a command everyone sees"]'
-  await people.sam.page.type(line, 'node src/greeting.js sam', { delay: 45 })
+  await people.sam.page.type(line, 'ls -1 src', { delay: 45 })
   await people.sam.page.press(line, 'Enter')
   await page.waitForTimeout(2600)
   await people.robin.page.type(line, 'rm -rf build dist', { delay: 45 })
@@ -131,7 +131,7 @@ const frames = await mkdtemp(join(tmpdir(), 'climp-png-'))
 execFileSync('ffmpeg', ['-y', '-i', video, '-vf', 'fps=10,scale=900:-2', join(frames, '%03d.png')], { stdio: 'ignore' })
 const out = 'docs/room.gif'
 const shots = readdirSync(frames).sort().map(name => join(frames, name))
-execFileSync('magick', ['-delay', '10', ...shots, '-fuzz', '2%', '-layers', 'optimize', out], { stdio: 'ignore' })
+execFileSync('magick', ['-delay', '10', '-loop', '0', ...shots, '-fuzz', '2%', '-layers', 'optimize', out], { stdio: 'ignore' })
 await rm(data, { recursive: true, force: true })
 await rm(frames, { recursive: true, force: true })
 console.log(`wrote ${out}`)
