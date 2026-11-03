@@ -34,15 +34,15 @@ const run = (args: string[], timeout = 180_000) =>
 
 export const installTool = async (code: string, workspace: string, memberId: string, tool: Tool) => {
   if (!useDocker()) return { ok: false, output: 'installing tools needs the room container (docker)' }
-  await ensureRoomContainer(code, workspace)
-  const result = await run(['exec', '-u', String(process.getuid?.() ?? 1000), '-e', `HOME=/homes/${memberId}`, containerName(code), ...installArgs(tool, memberId)])
+  await ensureRoomContainer(code, workspace, memberId)
+  const result = await run(['exec', '-u', String(process.getuid?.() ?? 1000), '-e', `HOME=/homes/${memberId}`, containerName(code, memberId), ...installArgs(tool, memberId)])
   return { ok: result.code === 0, output: result.output.slice(-4000) }
 }
 
 export const hasBin = async (code: string, memberId: string, bin: string, extraPath: string) => {
   if (!useDocker()) return false
   // `command` is a shell builtin, so it needs a shell, not a bare exec.
-  const result = await run(['exec', '-u', String(process.getuid?.() ?? 1000), '-e', `HOME=/homes/${memberId}`, '-e', `PATH=${extraPath}`, containerName(code), 'sh', '-c', `command -v ${bin.replace(/[^a-z0-9_-]/gi, '')}`], 10_000)
+  const result = await run(['exec', '-u', String(process.getuid?.() ?? 1000), '-e', `HOME=/homes/${memberId}`, '-e', `PATH=${extraPath}`, containerName(code, memberId), 'sh', '-c', `command -v ${bin.replace(/[^a-z0-9_-]/gi, '')}`], 10_000)
   return result.code === 0
 }
 

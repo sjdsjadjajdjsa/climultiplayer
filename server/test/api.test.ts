@@ -302,7 +302,7 @@ describe('tools and keys', () => {
     expect(ids).toContain('crush')
     for (const id of ['claude', 'codex', 'grok', 'copilot']) expect(ids).toContain(id)
     expect(body.tools.every((tool: any) => tool.installed === false)).toBe(true)
-    expect(body.container).toBe(false)
+    expect(typeof body.container).toBe('boolean')
   })
 
   it('rejects an unknown tool', async () => {
@@ -347,19 +347,29 @@ describe('publishing', () => {
     expect((await app.inject({ method: 'GET', url: `/p/${slug}/` })).statusCode).toBe(404)
   })
 
-  it('refuses traversal inside a published site', async () => {
+  it('serves a published site and nothing around it', async () => {
     app = await buildServer()
     const created = await createRoom(app)
-    await app.inject({ method: 'PUT', url: `/api/rooms/${created.code}/file`, headers: { 'x-climp-token': created.token }, payload: { path: 'index.html', content: 'x' } })
+    await app.inject({ method: 'PUT', url: `/api/rooms/${created.code}/file`, headers: { 'x-climp-token': created.token }, payload: { path: 'index.html', content: 'inside' } })
+    await app.inject({ method: 'PUT', url: `/api/rooms/${created.code}/file`, headers: { 'x-climp-token': created.token }, payload: { path: 'sub/deep.txt', content: 'deep' } })
     const published = await app.inject({ method: 'POST', url: '/api/pages', headers: { 'x-climp-token': created.token }, payload: { name: 'safe' } })
+    const slug = published.json().slug
+
+    const served = await app.inject({ method: 'GET', url: `/p/${slug}/` })
+    expect(served.statusCode).toBe(200)
+    expect(served.body).toBe('inside')
+    expect(served.headers['content-security-policy']).toContain('sandbox')
+    const nested = await app.inject({ method: 'GET', url: `/p/${slug}/sub/deep.txt` })
+    expect(nested.statusCode).toBe(200)
+
+    // Walking up is refused now: the data dir next to the site holds tokens.
     const { dataDir } = await import('../src/config.js')
     const { writeFile } = await import('node:fs/promises')
     const { join } = await import('node:path')
     await writeFile(join(dataDir, 'probe.txt'), 'outside')
-    const inside = await app.inject({ method: 'GET', url: `/p/${published.json().slug}/..%2F..%2Fprobe.txt` })
-    expect(inside.statusCode).toBe(200)
-    expect(inside.body).toBe('outside')
-    const escape = await app.inject({ method: 'GET', url: `/p/${published.json().slug}/..%2F..%2F..%2F..%2Fetc%2Fpasswd` })
+    const up = await app.inject({ method: 'GET', url: `/p/${slug}/..%2F..%2Fprobe.txt` })
+    expect(up.statusCode).toBe(404)
+    const escape = await app.inject({ method: 'GET', url: `/p/${slug}/..%2F..%2F..%2F..%2Fetc%2Fpasswd` })
     expect(escape.statusCode).toBe(404)
   })
 })

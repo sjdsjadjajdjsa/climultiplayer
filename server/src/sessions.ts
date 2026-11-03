@@ -73,7 +73,7 @@ export const startSession = async (
   member: { id: string; name: string; color: string },
   owner: WebSocket,
 ) => {
-  await ensureRoomContainer(code, workspace)
+  await ensureRoomContainer(code, workspace, member.id)
   const home = await ensureHome(code, member.id)
   const plan = execPlan(code, member.id, home)
   const pty = spawnPty(plan.file, plan.args, {

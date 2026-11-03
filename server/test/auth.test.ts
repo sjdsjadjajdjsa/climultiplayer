@@ -112,3 +112,29 @@ describe('authorize urls', () => {
     expect(url.searchParams.get('state')).toBeTruthy()
   })
 })
+
+describe('credential files', () => {
+  it('writes a member store owner-only, in an owner-only folder', async () => {
+    const { storeFor, authFile } = await import('../src/auth/registry.js')
+    const { statSync } = await import('node:fs')
+    const { dirname } = await import('node:path')
+    storeFor('member1').signOut(SUBSCRIPTIONS[0])
+    expect(statSync(authFile('member1')).mode & 0o777).toBe(0o600)
+    expect(statSync(dirname(authFile('member1'))).mode & 0o777).toBe(0o700)
+  })
+
+  it('keeps the file name stable for odd member ids', async () => {
+    const { authFile } = await import('../src/auth/registry.js')
+    expect(authFile('ab-12/../cd')).toMatch(/auth\/ab12cd\.json$/)
+  })
+
+  it('deletes the tokens when the member goes', async () => {
+    const { storeFor, authFile } = await import('../src/auth/registry.js')
+    const { existsSync } = await import('node:fs')
+    storeFor('member2').signOut(SUBSCRIPTIONS[0])
+    expect(existsSync(authFile('member2'))).toBe(true)
+    const { forgetSignIns } = await import('../src/rooms.js')
+    await forgetSignIns('member2')
+    expect(existsSync(authFile('member2'))).toBe(false)
+  })
+})

@@ -266,3 +266,23 @@ describe('member terminals', () => {
     host.socket.close()
   })
 })
+
+describe('member homes', () => {
+  it('mounts only the member own home into their terminal container', async () => {
+    const { code, hostToken } = await start()
+    const host = connect(code, hostToken)
+    await host.open
+    await waitFor(host.messages, message => message.type === 'hello')
+    host.socket.send(JSON.stringify({ type: 'term:open' }))
+    const opened = await waitFor(host.messages, message => message.type === 'term:session', 20_000)
+    const { execFileSync } = await import('node:child_process')
+    const names = execFileSync('docker', ['ps', '--filter', 'name=climp-room-', '--format', '{{.Names}}']).toString().trim().split('\n')
+    const mine = names.find(name => name.startsWith(`climp-room-${code.toLowerCase()}-`))
+    expect(mine).toBeTruthy()
+    const mounts = execFileSync('docker', ['inspect', mine!, '-f', '{{range .Mounts}}{{.Destination}} {{end}}']).toString()
+    const homes = mounts.split(' ').filter(entry => entry.startsWith('/homes/'))
+    expect(homes).toHaveLength(1)
+    expect(opened.id).toBeTruthy()
+    host.socket.close()
+  })
+})

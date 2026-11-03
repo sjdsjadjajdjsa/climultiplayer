@@ -25,7 +25,7 @@ const check = (name, ok, detail = '') => {
 }
 
 const server = spawn('node', ['server/dist/server.js'], {
-  env: { ...process.env, CLIMP_DATA: data, PORT: String(port), CLIMP_SHELL: process.env.CLIMP_SHELL ?? 'host', CLIMP_ROOM_NETWORK: process.env.CLIMP_ROOM_NETWORK ?? 'host' },
+  env: { ...process.env, CLIMP_DATA: data, PORT: String(port), CLIMP_SHELL: process.env.CLIMP_SHELL ?? 'host', CLIMP_ROOM_NETWORK: process.env.CLIMP_ROOM_NETWORK ?? 'host', CLIMP_ALLOW_HOST_NETWORK: '1' },
   stdio: 'ignore',
 })
 const base = `http://127.0.0.1:${port}`

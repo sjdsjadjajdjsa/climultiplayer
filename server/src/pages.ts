@@ -1,8 +1,8 @@
-import { cp, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises'
-import { dirname, join, posix, resolve, sep } from 'node:path'
+import { cp, lstat, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises'
+import { join, posix } from 'node:path'
 import { dataDir } from './config.js'
 import { RoomError } from './rooms.js'
-import { resolveInside } from './workspace.js'
+import { resolveSafe } from './workspace.js'
 
 // Public static sites, served on the same origin as the room app, which is what
 // lets a tunnel make them reachable without CORS or a second hostname.
@@ -54,7 +54,12 @@ export const publishPage = async (name: string, source: string) => {
   await rm(target, { recursive: true, force: true })
   await cp(source, target, {
     recursive: true,
-    filter: from => !['node_modules', '.git', '.env', '.DS_Store'].includes(from.split('/').pop() ?? ''),
+    // Links are left out: one made in the room could point anywhere on the host.
+    filter: async from => {
+      const name = from.split(/[\\/]/).pop() ?? ''
+      if (['node_modules', '.git', '.env', '.DS_Store'].includes(name) || name.startsWith('.env.')) return false
+      return !(await lstat(from)).isSymbolicLink()
+    },
   })
   const info = await stat(target)
   return { slug, updatedAt: info.mtimeMs }
@@ -88,15 +93,11 @@ export const readPageFile = async (slug: string, path: string): Promise<{ body: 
   const siteRoot = join(root(), slugify(slug))
   const raw = String(path ?? '').replace(/^\/+/, '')
   if (!raw || raw.endsWith('/')) return readPageFile(slug, `${raw}index.html`)
-  // Fastify does not collapse encoded `..`, so normalise first, then let a few
-  // levels up through (a published site may link to a sibling asset).
+  // Fastify does not collapse encoded `..`. Nothing above the site folder is
+  // ever served: the data dir next to it holds rooms.json and sign-in tokens.
   const clean = posix.normalize(raw)
-  // A little travel above the site is useful for shared assets; stop at the
-  // data dir so nothing outside it is served.
-  const allowed = resolve(siteRoot, clean)
-  const dataRoot = dirname(root())
-  if (!allowed.startsWith(dataRoot + sep)) throw new RoomError('not found', 404)
-  const full = clean.startsWith('..') ? allowed : resolveInside(siteRoot, clean)
+  if (clean.startsWith('..') || clean.includes(String.fromCharCode(0))) throw new RoomError('not found', 404)
+  const full = await resolveSafe(siteRoot, clean)
   const info = await stat(full).catch(() => null)
   if (!info?.isFile()) throw new RoomError('not found', 404)
   const extension = clean.split('.').pop()?.toLowerCase() ?? ''

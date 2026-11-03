@@ -8,7 +8,7 @@ import { chromium } from 'playwright'
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-docs-'))
-const server = spawn('node', ['server/dist/server.js'], { env: { ...process.env, CLIMP_DATA: data, PORT: String(port), CLIMP_SHELL: process.env.CLIMP_SHELL ?? 'docker', CLIMP_ROOM_NETWORK: process.env.CLIMP_ROOM_NETWORK ?? 'host' }, stdio: 'ignore' })
+const server = spawn('node', ['server/dist/server.js'], { env: { ...process.env, CLIMP_DATA: data, PORT: String(port), CLIMP_SHELL: process.env.CLIMP_SHELL ?? 'docker', CLIMP_ROOM_NETWORK: process.env.CLIMP_ROOM_NETWORK ?? 'host', CLIMP_ALLOW_HOST_NETWORK: '1' }, stdio: 'ignore' })
 const base = `http://127.0.0.1:${port}`
 for (let attempt = 0; attempt < 50; attempt++) {
   try { if ((await fetch(`${base}/api/health`)).ok) break } catch {}

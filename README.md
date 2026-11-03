@@ -29,12 +29,13 @@ git clone https://github.com/sjdsjadjajdjsa/climultiplayer
 cd climultiplayer
 npm install
 npm run room:image
-CLIMP_ROOM_NETWORK=host npm start
+CLIMP_ROOM_NETWORK=host CLIMP_ALLOW_HOST_NETWORK=1 npm start
 ```
 
 Open http://127.0.0.1:8787, pick a name, and click **or open a demo room** to look
-around on your own. `CLIMP_ROOM_NETWORK=host` is the sane default behind a VPN;
-drop it if docker's bridge works for you.
+around on your own. Host networking is the sane default behind a VPN, but it
+hands guests your loopback, so it needs the second flag; drop both if docker's
+bridge works for you.
 
 ## Contents
 
@@ -129,7 +130,10 @@ room, leave.
 
 A host can publish the room's files at `/p/<name>/` on the same address, so a
 tunnel exposes it with no account and no CORS. Files are copied to
-`$CLIMP_DATA/pages`, and the panel links and deletes them.
+`$CLIMP_DATA/pages`, without `node_modules`, `.git`, `.env*` or symlinks, and the
+panel links and deletes them. Pages are served with `Content-Security-Policy:
+sandbox`, so their scripts get an opaque origin and cannot call the API as
+whoever opened them. A path may not walk above its own site folder.
 
 ## Harnesses
 
@@ -180,7 +184,12 @@ asking too.
 
 ## What a guest can do
 
-Guests edit files and use the shared shell. Anything that looks dangerous
+Rooms only start from the host machine itself; a guest arriving through a tunnel
+asks for an invite instead. `CLIMP_OPEN_ROOMS=1` lets anyone start one.
+
+Guests edit files and use the shared shell. Without docker the shell is the host
+user's own, so only the host can type in it and only the host gets terminals;
+with the container, guests get both, each in their own home. Anything that looks dangerous
 (`rm`, `git push`, pipes into a shell, installs, redirects, `sudo`, ...) is held
 until the host clicks allow. The host runs risky commands directly.
 
@@ -217,12 +226,24 @@ are deleted after `CLIMP_ROOM_IDLE_MINUTES` (default 180).
   `trust` a guest into an editor role that skips risky-command approvals.
   A removed member needs a fresh invite to return.
 - Every run, approval and denial is recorded in a host-only command log.
-- The host can download the whole room as a `.tar.gz` at any time.
+- The host can download the whole room as a `.tar.gz` at any time, without
+  `.git`: hooks and `core.fsmonitor` in a guest-made repository would run on your
+  machine.
 - Files stay inside the room workspace; traversal is refused on every path.
 - The room shell runs in a throwaway container: only the workspace is mounted,
   capabilities are dropped, `no-new-privileges` is set, and memory, CPU and PID
   count are capped. Your home directory, the data dir and the docker socket stay
   outside it.
+- Each member's terminals and tool installs get their own container, mounting
+  only that member's own home, so a sign-in token in `/homes/<them>` is not
+  readable from someone else's shell. Only the owner and the host can watch a
+  personal terminal.
+- Plan tokens live in `$CLIMP_DATA/auth`, owner-only (`0700` folder, `0600`
+  files), and are deleted when the member is removed, leaves, or the room ends.
+- Symlinks made in the room are refused by the file API rather than followed on
+  the host, so `ln -s ~/.ssh/id_ed25519 key` cannot read your keys.
+- Cross-site requests and websocket upgrades need a matching `Origin`, and rooms
+  cannot be started from off the machine by default.
 - Guests still ask before risky commands; editing is never gated, promotion is
   explicit, and every command lands in the log.
 - The container root filesystem is read-only. `/tmp` is a small tmpfs, the
@@ -283,6 +304,10 @@ climultiplayer-room .` and `CLIMP_ROOM_NETWORK=host`.
 | `CLIMP_ROOM_MEMORY` | `1g` | memory cap per room |
 | `CLIMP_ROOM_CPUS` | `1` | CPU cap per room |
 | `CLIMP_ROOM_NETWORK` | `bridge` | `none` for an offline room, `host` if the bridge is broken |
+| `CLIMP_ALLOW_HOST_NETWORK` | unset | `1` to use `host` networking, which exposes your loopback to guests |
+| `CLIMP_TRUST_PROXY` | unset | `1` to trust forwarding headers from your tunnel, for join rate limits |
+| `CLIMP_ORIGINS` | unset | extra comma separated hosts allowed to call the API |
+| `CLIMP_OPEN_ROOMS` | unset | `1` to let anyone, not only this machine, start a room |
 | `CLIMP_WEB` | `web/dist` | built client directory |
 
 ## Tests

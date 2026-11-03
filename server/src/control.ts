@@ -175,6 +175,10 @@ export const controlRoutes = (app: FastifyInstance) => {
             sendTo(socket, { type: 'term:list', sessions: listSessions(room.code) })
             break
           case 'term:open': {
+            if (!useDocker() && client.member.role !== 'host') {
+              sendTo(socket, { type: 'notice', level: 'error', message: 'terminals for guests need the docker container on the host' })
+              break
+            }
             setActivity(client.member, 'in a terminal', 900)
             broadcastPresence(room)
             const session = await startSession(room.code, room.workspace, client.member, socket)
@@ -185,6 +189,9 @@ export const controlRoutes = (app: FastifyInstance) => {
           case 'term:attach': {
             const session = findSession(room, String(message.id ?? ''))
             if (!session) break
+            // Personal terminals show sign-in codes and tokens; only their owner
+            // and the host may watch one.
+            if (session.memberId !== client.member.id && client.member.role !== 'host') break
             attachSession(session, socket)
             sendTo(socket, { type: 'term:session', id: session.id, owner: session.owner === socket, replayed: session.scrollback.slice(-400) })
             break
@@ -288,6 +295,10 @@ const runShell = async (client: Client, room: Room, raw: string) => {
     return
   }
   client.runs.push(now)
+  if (!useDocker() && client.member.role !== 'host') {
+    sendTo(client.socket, { type: 'notice', level: 'error', message: 'the shared shell runs on the host itself (no docker), so only the host can type in it' })
+    return
+  }
   const terminal = await openTerminal(room.code, room.workspace)
   const risk = looksRisky(command)
   if (risk.risky && client.member.role === 'guest') {
@@ -306,7 +317,8 @@ const runShell = async (client: Client, room: Room, raw: string) => {
 
 const decideApproval = async (room: Room, id: string, allow: boolean, note?: string) => {
   const pending = approvals.get(id)
-  if (!pending) return
+  // Approvals are keyed globally; an editor in one room must not decide another's.
+  if (!pending || pending.room !== room) return
   clearTimeout(pending.timer)
   approvals.delete(id)
   recordAudit(room, { name: pending.member.name, command: pending.command, decision: allow ? 'allowed' : note ? 'auto-expired' : 'denied' })
