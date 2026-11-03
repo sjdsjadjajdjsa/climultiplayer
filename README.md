@@ -164,6 +164,7 @@ are deleted after `CLIMP_ROOM_IDLE_MINUTES` (default 180).
   cannot wave their own `rm -rf` through.
 - Shell input is rate limited to 8 commands per 5 seconds per member, and one
   assistant answer at a time, so nobody can bury the room or drain a plan.
+
 - The host can remove anyone with the × on their name, end the room outright, and
   `trust` a guest into an editor role that skips risky-command approvals.
   A removed member needs a fresh invite to return.
@@ -179,6 +180,8 @@ are deleted after `CLIMP_ROOM_IDLE_MINUTES` (default 180).
 - The container root filesystem is read-only. `/tmp` is a small tmpfs, the
   workspace and each member's home stay writable, and global installs are
   pointed at the member home, so `npm i -g` still works.
+
+![a guest command held until the host allows it, with the reasons it was held](docs/notice.png)
 
 Docker is required for the container shell. Without it the server falls back to
 a shell on the host (it says which at startup), and `CLIMP_SHELL=host` forces

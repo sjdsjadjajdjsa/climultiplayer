@@ -83,6 +83,17 @@ try {
     await guest.page.waitForSelector('.room-code', { timeout: 20_000 })
   }
 
+  await people[1].page.click('button[title="terminal"]')
+  await people[1].page.waitForSelector('.card-term.shared')
+  await people[1].page.fill('input[placeholder="run a command everyone sees"]', 'rm -rf dist && npm run build')
+  await people[1].page.press('input[placeholder="run a command everyone sees"]', 'Enter')
+  await host.waitForSelector('.notice.run', { timeout: 20_000 })
+  await host.waitForTimeout(900)
+  await host.screenshot({ path: 'docs/notice.png' })
+  await host.click('.notice.run button:has-text("allow")')
+  await people[1].page.click('button[title="terminal"]')
+  await host.waitForTimeout(1500)
+
   for (const person of people) {
     await person.page.click('.tree >> text=README.md')
     await person.page.waitForSelector('.cm-line')
