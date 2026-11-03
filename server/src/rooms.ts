@@ -476,3 +476,56 @@ export const sweepRooms = async () => {
 export const roomCount = () => rooms.size
 export const allRooms = () => [...rooms.values()]
 export const allMembers = () => allRooms().flatMap(room => [...room.members.values()])
+
+// A visitor should be able to feel the room without a second person around, so
+// an empty start lays down a small project worth opening and running.
+const demoFiles: Array<[string, string]> = [
+  ['README.md', `# a demo room
+
+Two ways to try this:
+
+- open \`src/notes.md\` and type. Everyone in the room sees it move under your cursor.
+- open \`src/greeting.js\`, then press "terminal" and run \`node src/greeting.js\`.
+
+Send this room's invite to a friend and the tree, the cursors and the shared
+shell are one place for both of you. Risky shell commands wait for the host.
+
+Delete the files if you would rather start clean.
+`],
+  ['src/greeting.js', `const who = process.argv[2] ?? 'you'
+
+console.log(\`hey \${who}, this ran in the shared shell\`)
+`],
+  ['src/notes.md', `# notes
+
+- [ ] invite someone
+- [ ] type at the same time in this file
+- [ ] run something risky in the shell and watch it wait
+- [ ] ask the assistant for an edit
+
+The assistant uses your own plan, not the host's.
+`],
+  ['styles.css', `:root {
+  --ink: #17181d;
+  --paper: #fcfcfd;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+`],
+]
+
+export const seedDemo = async (workspace: string) => {
+  for (const [path, body] of demoFiles) {
+    const full = join(workspace, path)
+    await mkdir(join(full, '..'), { recursive: true })
+    await writeFile(full, body)
+  }
+}

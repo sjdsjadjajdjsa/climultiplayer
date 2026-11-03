@@ -127,6 +127,14 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
   const followingRef = useRef<string | null>(null)
   followingRef.current = following
 
+  const demoOpened = useRef(false)
+  useEffect(() => {
+    if (!session.demo || demoOpened.current) return
+    if (!entries.some(entry => entry.path === 'src/notes.md')) return
+    demoOpened.current = true
+    open('src/notes.md')
+  }, [entries.length, session.demo])
+
   const open = (path: string) => {
     currentRef.current = path
     setCurrent(path)

@@ -17,7 +17,9 @@
     "serve": "node server/dist/server.js",
     "test:ui": "npm run build && node test/ui.mjs",
     "test:audit": "npm run build && node test/audit.mjs",
-    "docs:shots": "npm run build && node test/docs.mjs"
+    "docs:shots": "npm run build && node test/docs.mjs",
+    "tunnel": "npm run build && node scripts/tunnel.mjs",
+    "room:image:full": "docker build --network host -f Dockerfile.room.full -t climultiplayer-room:full ."
   },
   "engines": {
     "node": ">=20"

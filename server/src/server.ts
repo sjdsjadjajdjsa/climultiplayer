@@ -18,7 +18,7 @@ import { SUBSCRIPTIONS, subscriptionById } from './auth/subs.js'
 import { closeFileSockets, docRoutes, kickFileSockets } from './ws.js'
 import { broadcastJoins, closeControl, controlRoutes, kickSockets, notifyTree, refreshPresence } from './control.js'
 import {
-  allMembers, allRooms, createInvite, createRoom, decideJoin, removeMember, setRole, deleteRoom, expireJoins, findByToken, findJoin, findMember, getRoom,
+  allMembers, allRooms, createInvite, createRoom, decideJoin, removeMember, seedDemo, setRole, deleteRoom, expireJoins, findByToken, findJoin, findMember, getRoom,
   hashToken, inviteLifetimeMinutes, loadRooms, publicInvite, publicRoom, requestJoin, revokeInvite, RoomError, sweepRooms,
   type Member, type Room,
 } from './rooms.js'
@@ -98,10 +98,11 @@ export const buildServer = async () => {
   app.get('/api/health', async () => ({ ok: true, shell: useDocker() ? 'container' : 'host', network: useDocker() ? roomNetwork : 'host' }))
 
   app.post('/api/rooms', async (req, reply) => {
-    const body = (req.body ?? {}) as { name?: string; source?: string }
+    const body = (req.body ?? {}) as { name?: string; source?: string; demo?: boolean }
     const source = body.source ? resolve(String(body.source).replace(/^~(?=\/|$)/, homedir())) : undefined
     if (source && !existsSync(source)) return reply.code(400).send({ error: `no folder at ${source}` })
     const { room, member } = await createRoom(body.name ?? 'host', source)
+    if (body.demo && !source) await seedDemo(room.workspace)
     setSession(req, reply, room.code, member.token)
     return reply.send({ code: room.code, token: member.token, member, room: publicRoom(room) })
   })

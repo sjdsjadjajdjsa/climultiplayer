@@ -183,6 +183,12 @@ try {
   await host.click('.menu-row:has-text("sam") button:text("remove")')
   await guest.waitForSelector('.join-inner', { timeout: 6000 })
   check('a kicked guest is put back on the landing page', (await guest.textContent('.join-inner')).includes('removed'))
+
+  // A visitor on their own should get something to poke at, not an empty tree.
+  await guest.fill('input[placeholder="alex"]', 'solo')
+  await guest.click('text=or open a demo room')
+  await guest.waitForSelector('.cm-line', { timeout: 20_000 })
+  check('a demo room lands on the notes file', (await guest.locator('.file-tab').textContent()).includes('src/notes.md'))
   check('no page errors', errors.length === 0, errors.join(' | ').slice(0, 120))
 } catch (problem) {
   check(`flow aborted: ${problem.message.slice(0, 100)}`, false)

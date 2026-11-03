@@ -34,6 +34,9 @@ room, your original is untouched. A small `.git` is copied out of a real
 repository so `git status` and `git log` work in the room, but a history over
 40 MB is skipped to keep the copy light.
 
+No friend around? "open a demo room" drops a small project in the room so you can
+try cursors, the shell and the assistant on your own.
+
 A friend who opens the link lands on the join screen with the room already known
 from the link (no code to type), gets a name prompt, and waits. You get a queue entry and click allow. The invite token sits after the
 `#` in the link, so it never reaches the server in a request line and never
@@ -43,10 +46,12 @@ a fallback request, it just is not revocable.
 
 Same WiFi: the LAN link works as printed. Friends elsewhere:
 
-- **Tunnel (recommended).** Run the server bound to loopback and put a tunnel in
-  front (Cloudflare Tunnel or equivalent). Your IP is not in any invite, your
-  router needs no port forward, and you get TLS, which also switches the session
-  cookie to `Secure`. Works from anywhere.
+- **Tunnel (recommended).** `npm run tunnel` builds, binds to loopback, and puts
+  a throwaway Cloudflare Tunnel in front of it, printing a public link. Your IP
+  is not in any invite, your router needs no port forward, and you get TLS, which
+  also switches the session cookie to `Secure`. Works from anywhere. Needs
+  [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+  on PATH.
 - **Tailscale.** Put both machines on it and share the Tailscale address. Fine
   for people you already trust; the address reveals your tailnet membership.
 
@@ -191,6 +196,12 @@ the fallback. Build the image once after installing:
 npm run room:image
 ```
 
+That image is deliberately lean (about 870 MB): git, curl, an editor, a
+compiler. If people should drive their own agent inside the room, add the CLIs
+on top with `npm run room:image:full` and set
+`CLIMP_ROOM_IMAGE=climultiplayer-room:full`; that image is several gigabytes
+because it bundles four agent harnesses.
+
 If the daemon's bridge network hangs on apt (index lookups time out), build and
 run with host networking: `docker build --network host -f Dockerfile.room -t
 climultiplayer-room .` and `CLIMP_ROOM_NETWORK=host`.
@@ -225,7 +236,7 @@ climultiplayer-room .` and `CLIMP_ROOM_NETWORK=host`.
 | `CLIMP_ROOM_IDLE_MINUTES` | `180` | delete rooms idle this long |
 | `CLIMP_MAX_FILE` | `2097152` | largest editable file in bytes |
 | `CLIMP_SHELL` | `auto` | `docker` (contained), `host`, or `auto` |
-| `CLIMP_ROOM_IMAGE` | `climultiplayer-room:latest` | image the room shell runs |
+| `CLIMP_ROOM_IMAGE` | `climultiplayer-room:latest` | image the room shell runs; `climultiplayer-room:full` adds agent CLIs |
 | `CLIMP_ROOM_MEMORY` | `1g` | memory cap per room |
 | `CLIMP_ROOM_CPUS` | `1` | CPU cap per room |
 | `CLIMP_ROOM_NETWORK` | `bridge` | `none` for an offline room, `host` if the bridge is broken |

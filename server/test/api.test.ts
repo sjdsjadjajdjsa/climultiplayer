@@ -394,6 +394,18 @@ describe('starting from a folder', () => {
     await rm(source, { recursive: true, force: true })
   })
 
+  it('lays down a demo project to poke at', async () => {
+    app = await buildServer()
+    const res = await app.inject({ method: 'POST', url: '/api/rooms', payload: { name: 'host', demo: true } })
+    expect(res.statusCode).toBe(200)
+    const created = res.json()
+    const tree = await app.inject({ method: 'GET', url: `/api/rooms/${created.code}/tree`, headers: { 'x-climp-token': created.token } })
+    const paths = tree.json().entries.map((entry: any) => entry.path)
+    expect(paths).toContain('README.md')
+    expect(paths).toContain('src/greeting.js')
+    expect(paths).toContain('src/notes.md')
+  })
+
   it('leaves a big history behind', async () => {
     const { mkdtemp, mkdir, truncate, rm, writeFile } = await import('node:fs/promises')
     const { tmpdir } = await import('node:os')

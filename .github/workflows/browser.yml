@@ -1,0 +1,26 @@
+name: browser
+
+# The browser suite starts real containers, so it runs on demand rather than on
+# every push.
+on:
+  workflow_dispatch:
+
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: docker build -f Dockerfile.room -t climultiplayer-room:latest .
+      - run: npx playwright install --with-deps chromium
+      - name: point the suite at playwright's chromium
+        run: echo "CHROME_BIN=$(node -e "console.log(require('playwright').chromium.executablePath())")" >> "$GITHUB_ENV"
+      - run: node test/ui.mjs
+        env:
+          CLIMP_SHELL: docker
+          CLIMP_ROOM_NETWORK: host

@@ -1,6 +1,6 @@
 export type Member = { id: string; name: string; role: 'host' | 'guest' | 'editor'; color: string; online: boolean; file?: string | null; activity?: string | null }
 export type TreeEntry = { path: string; dir: boolean; size: number }
-export type Session = { code: string; member: Member }
+export type Session = { code: string; member: Member; demo?: boolean }
 export type Invite = { id: string; createdAt: number; expiresAt: number; used: boolean; revoked: boolean; state: 'open' | 'used' | 'revoked' | 'expired' }
 export type JoinTicket = { id: string; token: string; code: string; expiresAt: number }
 
@@ -21,8 +21,8 @@ export const me = async (): Promise<Session | null> => {
   }
 }
 
-export const createRoom = (name: string, source?: string) =>
-  request('/api/rooms', { method: 'POST', body: JSON.stringify({ name, source }) }) as Promise<{ code: string; member: Member }>
+export const createRoom = (name: string, source?: string, demo = false) =>
+  request('/api/rooms', { method: 'POST', body: JSON.stringify({ name, source, demo }) }) as Promise<{ code: string; member: Member }>
 
 export const requestJoin = async (code: string, name: string, invite: string): Promise<JoinTicket> => {
   const result = await request(`/api/rooms/${encodeURIComponent(code)}/join`, { method: 'POST', body: JSON.stringify({ name, invite }) })

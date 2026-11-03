@@ -30,14 +30,14 @@ export const Join = ({ onSession, notice = '' }: { onSession: (session: Session)
 
   const fromLink = invite.length > 20
 
-  const start = async () => {
+  const start = async (demo = false) => {
     if (!name.trim()) return setError('pick a display name first')
     setBusy(true)
     setError('')
     try {
-      const result = await createRoom(name, source.trim() || undefined)
+      const result = await createRoom(name, source.trim() || undefined, demo)
       history.replaceState(null, '', `/`)
-      onSession({ code: result.code, member: { ...result.member, online: true } })
+      onSession({ code: result.code, member: { ...result.member, online: true }, demo })
     } catch (problem: any) {
       setError(problem.message)
     } finally {
@@ -129,8 +129,11 @@ export const Join = ({ onSession, notice = '' }: { onSession: (session: Session)
               copy a folder in (optional)
               <input value={source} onChange={event => setSource(event.target.value)} placeholder="/home/you/project" />
             </label>
-            <button disabled={busy} onClick={start}>
+            <button disabled={busy} onClick={() => start()}>
               start room
+            </button>
+            <button className="link demo" disabled={busy} onClick={() => start(true)}>
+              or open a demo room
             </button>
           </div>
 

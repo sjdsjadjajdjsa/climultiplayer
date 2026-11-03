@@ -1,0 +1,13 @@
+# The base image plus the agent CLIs, so people can sign in and drive their own
+# agent in a room. Build the base first:
+#   npm run room:image && npm run room:image:full
+# then run with CLIMP_ROOM_IMAGE=climultiplayer-room:full
+#
+# A renamed package must not break the build, so the install is best effort.
+FROM climultiplayer-room:latest
+
+USER root
+RUN npm install -g --no-audit --no-fund \
+      @anthropic-ai/claude-code @openai/codex @xai-official/grok @github/copilot \
+  || npm install -g --no-audit --no-fund @anthropic-ai/claude-code @openai/codex
+USER node
