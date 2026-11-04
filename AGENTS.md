@@ -73,6 +73,10 @@ behaviour.
   outside the mount.
 - Rooms persist in `$CLIMP_DATA` and are deleted after `CLIMP_ROOM_IDLE_MINUTES`
   of no connections; the workspace copy and containers go with them.
+- **Rooms die two ways, one path.** Host-deleted and idle-swept rooms both go
+  through `teardownRoom` in `server/src/server.ts` (previews, control, file
+  sockets, member sessions, docs, then the room itself). New per-room state
+  belongs in that function, and `server/test/leak.test.ts` guards it.
 - Sessions are the `climp` cookie holding `<code>.<token>`; the websocket accepts
   the same token in `?token=` for tests and the CLI.
 
