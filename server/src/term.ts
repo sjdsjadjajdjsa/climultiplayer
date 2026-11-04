@@ -7,7 +7,6 @@ export type Terminal = {
   pty: IPty
   scrollback: string[]
   listeners: Set<(data: string) => void>
-  idle: NodeJS.Timeout | null
   container: string | null
   mode: 'container' | 'host'
   ready: Promise<void>
@@ -29,11 +28,7 @@ const push = (terminal: Terminal, data: string) => {
 
 export const openTerminal = async (roomCode: string, cwd: string) => {
   const existing = terminals.get(roomCode)
-  if (existing) {
-    if (existing.idle) clearTimeout(existing.idle)
-    existing.idle = null
-    return existing
-  }
+  if (existing) return existing
   // Two sockets can arrive while a container is still booting. Without this
   // they each spawned a pty and the loser's output went nowhere.
   const pending = starting.get(roomCode)
@@ -57,7 +52,7 @@ const start = async (roomCode: string, cwd: string) => {
     cwd,
     env: { ...process.env, TERM: 'xterm-256color' } as Record<string, string>,
   })
-  const terminal: Terminal = { pty, scrollback: [], listeners: new Set(), idle: null, container: plan.container, mode: plan.mode, ready: Promise.resolve() }
+  const terminal: Terminal = { pty, scrollback: [], listeners: new Set(), container: plan.container, mode: plan.mode, ready: Promise.resolve() }
   // Typing into a pty before its shell has printed a prompt loses the bytes,
   // so the first reader waits for the shell to speak (or give up shortly).
   terminal.ready = new Promise<void>((resolve) => {
