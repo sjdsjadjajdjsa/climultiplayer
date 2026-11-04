@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 import { host, lan, port, dataDir, previewPort, roomNetwork, webDir } from './config.js'
 import { shareLinks } from './addresses.js'
 import { reapOrphanContainers, useDocker } from './shell.js'
-import { bridgeEgress, memberPath, networkRefusal, removeMemberContainer } from './container.js'
+import { bridgeEgress, memberPath, networkRefusal, removeMemberContainer, roomImageReady } from './container.js'
 import { hasBin, installTool, TOOLS, toolById } from './tools.js'
 import { deletePage, listPages, publishPage, readPageFile } from './pages.js'
 import { clearedCookie, cookieHeader, cookieSession, requestToken } from './session.js'
@@ -132,7 +132,7 @@ export const buildServer = async () => {
   docRoutes(app)
   controlRoutes(app)
 
-  app.get('/api/health', async () => ({ ok: true, shell: useDocker() ? 'container' : 'host', network: useDocker() ? roomNetwork : 'host' }))
+  app.get('/api/health', async () => ({ ok: true, shell: useDocker() ? 'container' : 'host', network: useDocker() ? roomNetwork : 'host', image: await roomImageReady() }))
 
   app.post('/api/rooms', async (req, reply) => {
     // Anyone who can reach the server could otherwise start a room, get a shell
@@ -573,6 +573,11 @@ export const startServer = async () => {
   console.log(`room shells: ${useDocker() ? 'container' : 'host process (docker not found, or CLIMP_SHELL=host)'}`)
   if (!useDocker() && (host === '0.0.0.0' || host === '::')) {
     console.log('  warning: shells run as this user with no container. Guests can reach your home directory.')
+  }
+  if (useDocker()) {
+    void roomImageReady().then(ready => {
+      if (!ready) console.log('  warning: the room image is not built, so room shells will not start.\n  build it once: npm run room:image')
+    })
   }
   if (useDocker() && networkRefusal()) console.log(`  warning: ${networkRefusal()}\n  room shells will not start until that changes.`)
   if (useDocker()) {

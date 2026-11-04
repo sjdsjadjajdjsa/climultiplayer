@@ -50,6 +50,7 @@ export const Join = ({ onSession, notice = '' }: { onSession: (session: Session)
         say(contained ? 'dim' : 'bad', '', contained
           ? 'shells run in a throwaway container with only the room copy mounted.'
           : 'shells run as this user with no container: guests could reach your home folder.')
+        if (contained && health.image === false) say('bad', 'the room image is not built yet. in a terminal: npm run room:image')
         if (contained && health.network === 'none') say('dim', 'the container has no network.')
         if (opened.token) say('dim', `an invite for room ${opened.code || '(unknown)'} is in this link.`)
         say('out', '', 'what should we call you?')

@@ -40,6 +40,19 @@ export const bridgeEgress = async () => {
   return probe.code === 0
 }
 
+// Whether the room image exists. Without it every room shell fails to start, so
+// the landing page and the startup banner say so instead of leaving it a mystery.
+let imageChecked = 0
+let imageOk = true
+export const roomImageReady = async () => {
+  if (!useDocker()) return true
+  if (Date.now() - imageChecked < 10_000) return imageOk
+  const found = await docker(['image', 'inspect', roomImage], 8_000)
+  imageOk = found.code === 0
+  imageChecked = Date.now()
+  return imageOk
+}
+
 // Host networking hands a guest the host's loopback: this server's own API,
 // databases, admin panels, anything bound to 127.0.0.1. Opt in explicitly.
 export const networkRefusal = () => {

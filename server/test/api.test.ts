@@ -292,6 +292,17 @@ describe('audit log', () => {
   })
 })
 
+describe('health', () => {
+  it('reports the shell mode, network and whether the room image exists', async () => {
+    app = await buildServer()
+    const res = await app.inject({ method: 'GET', url: '/api/health' })
+    const body = res.json()
+    expect(body.ok).toBe(true)
+    expect(['container', 'host']).toContain(body.shell)
+    expect(typeof body.image).toBe('boolean')
+  })
+})
+
 describe('tools and keys', () => {
   it('lists the catalog with install state', async () => {
     app = await buildServer()

@@ -22,7 +22,8 @@
     "room:image:full": "docker build --network host -f Dockerfile.room.full -t climultiplayer-room:full .",
     "docs:gif": "npm run build && node test/gif.mjs",
     "test:walk": "npm run build && node test/walk.mjs",
-    "docs:social": "npm run build && node test/social.mjs"
+    "docs:social": "npm run build && node test/social.mjs",
+    "doctor": "node scripts/doctor.mjs"
   },
   "engines": {
     "node": ">=20"

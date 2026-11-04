@@ -20,26 +20,46 @@ everyone's own cursor and colour, a shared shell, and each person's own AI plan.
 - **Boring to set up.** One `npm start`, no account, nothing hosted for you.
   Invites are single use, expiring and revocable, and every join is your call.
 
-## Try it
+## Quick start
 
-Needs Node 20+ and Docker.
+You need three things installed:
+
+| | Check | Why |
+|---|---|---|
+| Node.js 20 or newer | `node -v` | runs the server |
+| Docker, running | `docker info` | each room's shell runs in a throwaway container |
+| git | `git --version` | to download this |
 
 ```bash
 git clone https://github.com/sjdsjadjajdjsa/climultiplayer
 cd climultiplayer
 npm install
-npm run room:image
-CLIMP_ROOM_NETWORK=host CLIMP_ALLOW_HOST_NETWORK=1 npm start
+npm run room:image   # once: builds the shell image, about 870 MB, a few minutes
+npm run doctor       # checks the above and tells you exactly what to fix
+npm start
 ```
 
-Open http://127.0.0.1:8787, type a name at the prompt, then `demo` to look around
-on your own (or `start`, or click the word under the prompt). Host networking is the sane default behind a VPN, but it
-hands guests your loopback, so it needs the second flag; drop both if docker's
-bridge works for you.
+Then open http://127.0.0.1:8787, type a name at the prompt, and type `demo` to look
+around on your own. `start` makes an empty room, and `start /path/to/folder` makes
+one from a copy of a folder (your original is never touched). Each of those is
+also a button under the prompt. Stop the server with `Ctrl+C`.
+
+To bring friends in, see [Host it for friends](#host-it-for-friends).
+
+**If something goes wrong**
+
+| What you see | What to do |
+|---|---|
+| `docker: command not found`, or "docker is not running" | Install Docker, or start it, then run `npm run doctor` again |
+| The landing page says the room image is not built | `npm run room:image` |
+| Installs in a room hang, or the image build stalls (often a VPN) | The docker bridge is blocked. Run `CLIMP_ROOM_NETWORK=host CLIMP_ALLOW_HOST_NETWORK=1 npm start`. Guests can then reach your machine's loopback, so only do this with people you trust |
+| `address already in use` | Another copy is running. `PORT=8790 npm start`, or stop the other one |
+| A blank page after rebuilding | Restart the server; it keeps serving the old asset names |
+| No Docker at all | `CLIMP_SHELL=host npm start` runs the shell as you, and only the host can type in it |
 
 ## Contents
 
-[Try it](#try-it) · [Host it](#host-it-for-friends) · [Plans](#plans) ·
+[Quick start](#quick-start) · [Host it](#host-it-for-friends) · [Plans](#plans) ·
 [Terminals](#terminals) · [Previews](#previews) · [How it works](#how-it-works) ·
 [Security](#security-posture) · [Limits](#limits-of-the-base) ·
 [Configuration](#configuration) · [Tests](#tests)
@@ -49,7 +69,7 @@ bridge works for you.
 One person hosts. Their machine runs the server and holds the workspace; friends
 join over the network. Nobody needs an account and nothing is hosted for you.
 
-One command past the steps above:
+Once the quick start works, one more command:
 
 ```bash
 npm run host
@@ -62,10 +82,10 @@ climultiplayer on http://127.0.0.1:8787 (local)
   share with friends: http://192.168.1.24:8787
 ```
 
-Open the local URL, pick a name, start a room, then hit **invite** on the room
-code. That mints a single-use link and copies it; send it wherever. To start from
-an existing folder, put its path in "copy a folder in": it is copied into the
-room, your original is untouched. A small `.git` is copied out of a real
+Open the local URL, type a name and `start` (or `start /path/to/folder` to begin
+from a copy of a folder), then click the room code at the top left. That mints a
+single-use invite link and copies it; send it wherever. The folder is copied into
+the room and your original is untouched. A small `.git` is copied out of a real
 repository so `git status` and `git log` work in the room, but a history over
 40 MB is skipped to keep the copy light.
 
@@ -110,7 +130,7 @@ build when you know `dist` is current. Pass `--lan` or set `HOST` to open it up.
 
 ## Plans
 
-Click **plans** in the bar and connect a subscription you already pay for:
+Open the `···` menu at the top right, choose **Settings**, and connect a subscription you already pay for:
 ChatGPT, Claude, Grok or GitHub Copilot. Sign-in uses the same public CLI client
 each vendor's own tool uses, and tokens are stored per member on the server, in
 `$CLIMP_DATA/auth/<member>.json` (mode 0600). Nothing is sent anywhere except to
