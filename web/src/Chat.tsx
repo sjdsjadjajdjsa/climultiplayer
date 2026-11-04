@@ -83,10 +83,21 @@ export const Chat = ({ session, models, model, onModel, send, register, file, se
     send({ type: 'chat', messages: history, model, file, selection })
   }
 
+  const fileName = file?.split('/').pop()
+
   return (
     <div className="chat">
       <div className="chat-head">
-        <strong>assistant</strong>
+        <span className="chat-ctx" title={file ? 'the assistant can see this file and your selection' : 'no file is open, so the assistant answers without code context'}>
+          {file ? (
+            <>
+              <code>{fileName}</code>
+              {selection ? <em>{selection.length} selected</em> : null}
+            </>
+          ) : (
+            <em>no file context</em>
+          )}
+        </span>
         {models.length ? (
           <select value={model} onChange={event => onModel(event.target.value)}>
             {models.map(entry => (
@@ -151,7 +162,7 @@ export const Chat = ({ session, models, model, onModel, send, register, file, se
           onKeyDown={event => {
             if (event.key === 'Enter' && !event.shiftKey) submit(event)
           }}
-          placeholder="ask, or describe a change…"
+          placeholder={file ? `ask about ${fileName}, or describe a change…` : 'ask, or describe a change…'}
           rows={3}
         />
         <button type="submit" disabled={!draft.trim()}>

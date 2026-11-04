@@ -109,10 +109,12 @@ what each person is doing), terminals are flat dark windows, and the glow, glass
 header, pill chips, pulsing dots, uppercase kickers and global pill radius are
 gone. Fonts are self-hosted (Instrument Sans, Commit Mono) through fontsource.
 
-Still open: the room's `···` menu is long (settings, invites, publish, export, log,
-people, end, leave) and could be split by who needs it; the editor chrome and
-the assistant tab have had only a colour pass; dark mode has been checked by
-eye on the landing and not across every modal.
+Still open: nothing on the menu or dark-mode front. The room's `···` menu is
+grouped by audience (you / share / people / room) and closes on Escape; the
+file tab shows who else is in the open file, and the assistant tab shows the
+file and selection it will see instead of a redundant title. Dark mode has been
+walked across the modals with `WALK_SCHEME=dark npm run test:walk`, not just
+the landing.
 
 Driving the landing in tests goes through `test/landing.mjs` (type a name, then a
 command). `npm run test:walk` shoots every surface plus a phone-width landing and

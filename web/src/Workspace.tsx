@@ -342,6 +342,16 @@ export const Workspace = ({ session, onLeave }: { session: Session; onLeave: (re
             <>
               <div className="file-tab">
                 <code>{current}</code>
+                <span className="file-viewers">
+                  {members
+                    .filter(member => member.id !== session.member.id && member.online && member.file === current)
+                    .map(member => (
+                      <span key={member.id} className="file-viewer" title={`${member.name} is here too`}>
+                        <i style={{ background: member.color }} />
+                        {member.name}
+                      </span>
+                    ))}
+                </span>
               </div>
               <Editor session={session} path={current} onSelection={setSelection} onTyping={() => send({ type: 'typing' })} />
             </>
@@ -512,6 +522,14 @@ type MenuProps = {
 const Menu = (props: MenuProps) => {
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
   return (
     <div className="menu">
       <button className="ghost" onClick={() => setOpen(value => !value)} title="more">
@@ -525,11 +543,16 @@ const Menu = (props: MenuProps) => {
             <span className={props.shell === 'container' ? 'menu-state on' : 'menu-state warn'}>
               {props.shell === 'container' ? 'container shell' : 'host shell'}
             </span>
+            <span className="menu-label">you</span>
             <button onClick={() => { props.onSettings('accounts'); close() }}>Settings…</button>
-            {props.isHost && <button onClick={() => { props.onInvites(true); close() }}>Invites</button>}
-            {props.isHost && <button onClick={() => { props.onPublish(); close() }}>Publish site</button>}
-            {props.isHost && <a href={props.exportHref} download onClick={close}>Download room</a>}
-            {props.isHost && <button onClick={() => { props.onLog(true); close() }}>Command log</button>}
+            {props.isHost && (
+              <>
+                <span className="menu-label">share</span>
+                <button onClick={() => { props.onInvites(true); close() }}>Invites</button>
+                <button onClick={() => { props.onPublish(); close() }}>Publish site</button>
+                <a href={props.exportHref} download onClick={close}>Download room</a>
+              </>
+            )}
             {props.isHost && props.others.length > 0 && (
               <>
                 <span className="menu-label">people</span>
@@ -547,7 +570,8 @@ const Menu = (props: MenuProps) => {
               </>
             )}
             <span className="menu-label">room</span>
-            {props.isHost && <button onClick={() => { props.onEnd(); close() }}>End room</button>}
+            {props.isHost && <button onClick={() => { props.onLog(true); close() }}>Command log</button>}
+            {props.isHost && <button className="danger" onClick={() => { props.onEnd(); close() }}>End room</button>}
             <button onClick={() => { props.onLeave(); close() }}>Leave</button>
           </div>
         </>
