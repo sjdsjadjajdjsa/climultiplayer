@@ -58,6 +58,26 @@ describe('room socket', () => {
     guest.socket.close()
   })
 
+  // Browsers never see the query token path; they ride on the climp cookie.
+  it('accepts the session cookie in place of a query token', async () => {
+    const { code, hostToken } = await start()
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/room/${code}`, {
+      headers: { cookie: `climp=${encodeURIComponent(`${code}.${hostToken}`)}` },
+    })
+    const messages: any[] = []
+    socket.on('message', data => messages.push(JSON.parse(String(data))))
+    await new Promise(resolve => socket.on('open', resolve))
+    await waitFor(messages, message => message.type === 'hello')
+    socket.close()
+  })
+
+  it('refuses a socket with no token at all', async () => {
+    const { code } = await start()
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/room/${code}`)
+    const closed = await new Promise<number>(resolve => socket.on('close', resolve))
+    expect(closed).toBe(4401)
+  })
+
   it('pushes the join queue to the host', async () => {
     const { code, hostToken } = await start()
     const host = connect(code, hostToken)

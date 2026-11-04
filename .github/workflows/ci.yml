@@ -25,3 +25,11 @@ jobs:
           CLIMP_ROOM_NETWORK: host
           CLIMP_ALLOW_HOST_NETWORK: "1"
       - run: npm run build
+      # The browser suite drives the real UI end to end; without it the guest
+      # shell and approval flow can rot while the unit suite stays green.
+      - run: npx playwright install --with-deps chromium
+      - run: node test/ui.mjs
+        env:
+          CLIMP_SHELL: docker
+          CLIMP_ROOM_NETWORK: host
+          CLIMP_ALLOW_HOST_NETWORK: "1"

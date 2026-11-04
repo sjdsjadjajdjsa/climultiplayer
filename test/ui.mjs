@@ -1,6 +1,7 @@
 // Drives the real UI in a real browser: two contexts, one room, the whole join
 // and edit path. Run with: npm run test:ui (needs a chromium binary).
 import { execFileSync, spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,7 +11,10 @@ import { enterName, joinFromLink, openDemo, ready, startRoom } from './landing.m
 
 const port = 9000 + Math.floor(Math.random() * 900)
 const data = await mkdtemp(join(tmpdir(), 'climp-ui-'))
-const browserPath = process.env.CHROME_BIN ?? '/usr/bin/chromium'
+// A system chromium if there is one; otherwise the playwright-managed
+// download (what CI installs) is used, which is the default when no
+// executablePath is given.
+const browserPath = process.env.CHROME_BIN ?? (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined)
 
 const checks = []
 // axe is noisy on purpose; only the levels that actually stop someone count.
