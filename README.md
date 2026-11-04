@@ -52,6 +52,7 @@ To bring friends in, see [Host it for friends](#host-it-for-friends).
 |---|---|
 | `docker: command not found`, or "docker is not running" | Install Docker, or start it, then run `npm run doctor` again |
 | The landing page says the room image is not built | `npm run room:image` |
+| The image build fails at `apt-get` (often a VPN) | `npm run room:image` retries once with host networking on its own; if it still fails, disconnect the VPN and run it again |
 | Installs in a room hang, or the image build stalls (often a VPN) | The docker bridge is blocked. Run `CLIMP_ROOM_NETWORK=host CLIMP_ALLOW_HOST_NETWORK=1 npm start`. Guests can then reach your machine's loopback, so only do this with people you trust |
 | `address already in use` | Another copy is running. `PORT=8790 npm start`, or stop the other one |
 | A blank page after rebuilding | Restart the server; it keeps serving the old asset names |

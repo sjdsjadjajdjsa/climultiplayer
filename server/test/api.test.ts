@@ -316,7 +316,7 @@ describe('member session hygiene', () => {
       expect(created.token && body.includes(created.token)).toBe(false)
       expect(body).toContain('tokenHash')
     }
-    expect([0o600, 0o644]).toContain(mode)
+    expect(mode).toBe(0o600)
   })
 
   it('refuses more pending requests than the host can see', async () => {

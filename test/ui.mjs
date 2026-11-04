@@ -1,6 +1,6 @@
 // Drives the real UI in a real browser: two contexts, one room, the whole join
 // and edit path. Run with: npm run test:ui (needs a chromium binary).
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -25,8 +25,29 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` (${detail})` : ''}`)
 }
 
+// Sections run one after another; a thrown wait records a failure for that
+// section and the run continues, so one broken surface does not hide the rest.
+const section = async (name, fn) => {
+  try {
+    await fn()
+  } catch (problem) {
+    check(`${name} section aborted`, false, problem.message.split('\n')[0].slice(0, 80))
+  }
+}
+
+// Guests only get a shell in the container, so run the room in it when the
+// image exists (same rule as server/test/setup.ts); CLIMP_SHELL overrides.
+const shellMode = process.env.CLIMP_SHELL ?? (() => {
+  try {
+    execFileSync('docker', ['image', 'inspect', 'climultiplayer-room:latest'], { stdio: 'ignore' })
+    return 'docker'
+  } catch {
+    return 'host'
+  }
+})()
+
 const server = spawn('node', ['server/dist/server.js'], {
-  env: { ...process.env, CLIMP_DATA: data, PORT: String(port), CLIMP_SHELL: process.env.CLIMP_SHELL ?? 'host', CLIMP_ROOM_NETWORK: process.env.CLIMP_ROOM_NETWORK ?? 'host', CLIMP_ALLOW_HOST_NETWORK: '1' },
+  env: { ...process.env, CLIMP_DATA: data, PORT: String(port), CLIMP_SHELL: shellMode, CLIMP_ROOM_NETWORK: process.env.CLIMP_ROOM_NETWORK ?? 'host', CLIMP_ALLOW_HOST_NETWORK: '1' },
   stdio: 'ignore',
 })
 const base = `http://127.0.0.1:${port}`
@@ -104,108 +125,128 @@ try {
   await host.waitForFunction(() => document.querySelector('.cm-content')?.textContent?.includes('and sam'), null, { timeout: 6000 }).catch(() => {})
   check('what a guest types reaches the host live', (await host.textContent('.cm-content')).includes('and sam'))
 
-  await guest.click('button:text("terminal")')
-  await guest.waitForSelector('.stage')
-  await guest.fill('.card-input input', 'pwd')
-  await guest.keyboard.press('Enter')
-  await guest.waitForTimeout(1200)
-  const terminal = await guest.textContent('.xterm-rows')
-  check('the shared shell runs a harmless command', terminal.includes('/workspace'))
+  await section('the shared shell and approvals', async () => {
+    await guest.click('button:text("terminal")')
+    await guest.waitForSelector('.stage')
+    await guest.fill('.card-input input', 'pwd')
+    await guest.keyboard.press('Enter')
+    await guest.waitForTimeout(1200)
+    const terminal = await guest.textContent('.xterm-rows')
+    check('the shared shell runs a harmless command', terminal.includes('/workspace'))
 
-  await guest.fill('.card-input input', 'rm -rf nothing-here')
-  await guest.keyboard.press('Enter')
-  await host.waitForSelector('.notice.run', { timeout: 5000 })
-  check('a risky guest command asks the host', true)
-  await host.click('.notice.run button:has-text("deny")')
-  await guest.waitForTimeout(800)
-  check('denying reports back to the guest', (await guest.textContent('.xterm-rows')).includes('denied'))
+    await guest.fill('.card-input input', 'rm -rf nothing-here')
+    await guest.keyboard.press('Enter')
+    await host.waitForSelector('.notice.run', { timeout: 5000 })
+    check('a risky guest command asks the host', true)
+    await host.click('.notice.run button:has-text("deny")')
+    await guest.waitForTimeout(800)
+    check('denying reports back to the guest', (await guest.textContent('.xterm-rows')).includes('denied'))
+  })
 
-  await guest.reload()
-  await guest.waitForSelector('.app', { timeout: 8000 })
-  check('a reload keeps the guest in the room', true)
+  await section('reconnecting', async () => {
+    await guest.reload()
+    await guest.waitForSelector('.app', { timeout: 8000 })
+    check('a reload keeps the guest in the room', true)
+  })
 
-  if ((await guest.locator('.stage').count()) === 0) await guest.click('button:text("terminal")')
-  await guest.click('.stage-bar button:text("+ new")')
-  await guest.waitForSelector('.card-term:has-text("you")', { timeout: 8000 })
-  await guest.waitForTimeout(900)
-  await guest.click('.card-term.on .card-body')
-  await guest.keyboard.type('echo tty-works')
-  await guest.keyboard.press('Enter')
-  await guest.waitForTimeout(900)
-  check('a member can open their own terminal', (await guest.textContent('.card-term.on .xterm-rows')).includes('tty-works'))
+  await section('personal terminals', async () => {
+    if ((await guest.locator('.stage').count()) === 0) await guest.click('button:text("terminal")')
+    await guest.click('.stage-bar button:text("+ new")')
+    await guest.waitForSelector('.card-term:has-text("you")', { timeout: 8000 })
+    await guest.waitForTimeout(900)
+    await guest.click('.card-term.on .card-body')
+    await guest.keyboard.type('echo tty-works')
+    await guest.keyboard.press('Enter')
+    await guest.waitForTimeout(900)
+    check('a member can open their own terminal', (await guest.textContent('.card-term.on .xterm-rows')).includes('tty-works'))
 
-  if ((await host.locator('.stage').count()) === 0) await host.click('button:text("terminal")')
-  await host.click('.card-term:has-text("sam")')
-  await host.waitForTimeout(900)
-  const watched = await host.textContent('.card-term.on .xterm-rows')
-  check('others can watch that terminal read only', watched.includes('tty-works'), watched.slice(-40))
+    if ((await host.locator('.stage').count()) === 0) await host.click('button:text("terminal")')
+    await host.click('.card-term:has-text("sam")')
+    await host.waitForTimeout(900)
+    const watched = await host.textContent('.card-term.on .xterm-rows')
+    check('others can watch that terminal read only', watched.includes('tty-works'), watched.slice(-40))
 
-  await guest.keyboard.type('echo keep > ~/persisted')
-  await guest.keyboard.press('Enter')
-  await guest.waitForTimeout(700)
-  await guest.reload()
-  await guest.waitForSelector('.app')
-  await guest.click('button:text("terminal")')
-  await guest.click('.stage-bar button:text("+ new")')
-  await guest.waitForSelector('.card-term:has-text("you")')
-  await guest.waitForTimeout(1500)
-  await guest.click('.card-term.on .card-body')
-  await guest.keyboard.type('cat ~/persisted 2>/dev/null || echo missing')
-  await guest.keyboard.press('Enter')
-  await guest.waitForTimeout(1200)
-  check('a home directory survives a reconnect', (await guest.textContent('.card-term.on .xterm-rows')).includes('keep'))
+    await guest.keyboard.type('echo keep > ~/persisted')
+    await guest.keyboard.press('Enter')
+    await guest.waitForTimeout(700)
+    await guest.reload()
+    await guest.waitForSelector('.app')
+    await guest.click('button:text("terminal")')
+    await guest.click('.stage-bar button:text("+ new")')
+    await guest.waitForSelector('.card-term:has-text("you")')
+    await guest.waitForTimeout(1500)
+    await guest.click('.card-term.on .card-body')
+    await guest.keyboard.type('cat ~/persisted 2>/dev/null || echo missing')
+    await guest.keyboard.press('Enter')
+    await guest.waitForTimeout(1200)
+    check('a home directory survives a reconnect', (await guest.textContent('.card-term.on .xterm-rows')).includes('keep'))
+  })
 
-  await host.click('.person:has-text("sam")')
-  await host.waitForTimeout(400)
-  check('following a member works', (await host.locator('.person.following').count()) === 1)
+  await section('follow mode', async () => {
+    await host.click('.person:has-text("sam")')
+    await host.waitForTimeout(400)
+    check('following a member works', (await host.locator('.person.following').count()) === 1)
 
-  await host.waitForTimeout(1400)
-  check('follow mode parks on their terminal', (await host.textContent('.card-term.on header')).includes('sam'))
-  await host.click('.person.following')
+    await host.waitForTimeout(1400)
+    check('follow mode parks on their terminal', (await host.textContent('.card-term.on header')).includes('sam'))
+    await host.click('.person.following')
+  })
 
-  await guest.click('.menu button.ghost')
-  await guest.click('.menu-sheet button:text("Settings…")')
-  await guest.click('.settings-tabs button:text("tools and keys")')
-  await guest.waitForSelector('.modal-card')
-  await guest.waitForSelector('.accounts li', { timeout: 8000 }).catch(() => {})
-  const toolsText = await guest.textContent('.modal-card')
-  check('the tools catalog is listed', toolsText.includes('Crush'), toolsText.slice(0, 80).replace(/\s+/g, ' '))
-  await guest.click('.modal-card button:text("close")')
-  await guest.click('.card-term:has-text("shared shell")')
+  await section('the tools catalog', async () => {
+    await guest.click('.menu button.ghost')
+    await guest.click('.menu-sheet button:text("Settings…")')
+    await guest.click('.settings-tabs button:text("tools and keys")')
+    await guest.waitForSelector('.modal-card')
+    await guest.waitForSelector('.accounts li', { timeout: 8000 }).catch(() => {})
+    const toolsText = await guest.textContent('.modal-card')
+    check('the tools catalog is listed', toolsText.includes('Crush'), toolsText.slice(0, 80).replace(/\s+/g, ' '))
+    await guest.click('.modal-card button:text("close")')
+    await guest.click('.card-term:has-text("shared shell")')
+  })
 
-  await host.click('.menu button.ghost')
-  await host.click('.menu-row:has-text("sam") button:text("trust")')
-  await guest.waitForTimeout(500)
-  check('the host can trust a guest', (await host.textContent('.person:has-text("sam")')).includes('trusted'))
-  if ((await guest.locator('.stage').count()) === 0) await guest.click('button:text("terminal")')
-  await guest.fill('.card-input input', 'rm -f also-nothing')
-  await guest.keyboard.press('Enter')
-  await guest.waitForTimeout(900)
-  check('an editor runs risky commands without asking', !(await host.isVisible('.notice.run')))
+  await section('trust and the shared shell', async () => {
+    await host.click('.menu button.ghost')
+    await host.click('.menu-row:has-text("sam") button:text("trust")')
+    await guest.waitForTimeout(500)
+    check('the host can trust a guest', (await host.textContent('.person:has-text("sam")')).includes('trusted'))
+    if ((await guest.locator('.stage').count()) === 0) await guest.click('button:text("terminal")')
+    await guest.fill('.card-input input', 'rm -f also-nothing')
+    await guest.keyboard.press('Enter')
+    await guest.waitForTimeout(900)
+    check('an editor runs risky commands without asking', !(await host.isVisible('.notice.run')))
+  })
 
-  await host.click('.menu button.ghost')
-  await host.click('.menu-sheet button:text("Command log")')
-  await host.waitForSelector('.modal-card code')
-  check('the log shows what ran', (await host.textContent('.modal-card')).includes('rm -f also-nothing'))
-  await host.click('.modal-card button:text("close")')
+  await section('the command log', async () => {
+    await host.click('.menu button.ghost')
+    await host.click('.menu-sheet button:text("Command log")')
+    await host.waitForSelector('.modal-card code')
+    check('the log shows what ran', (await host.textContent('.modal-card')).includes('rm -f also-nothing'))
+    await host.click('.modal-card button:text("close")')
+  })
 
-  const exported = await host.evaluate(async url => {
-    const res = await fetch(url)
-    return { type: res.headers.get('content-type'), bytes: (await res.arrayBuffer()).byteLength }
-  }, `${base}/api/rooms/${code}/export`)
-  check('the host can download the room', exported.type.includes('gzip') && exported.bytes > 20, JSON.stringify(exported))
+  await section('the room export', async () => {
+    const exported = await host.evaluate(async url => {
+      const res = await fetch(url)
+      return { type: res.headers.get('content-type'), bytes: (await res.arrayBuffer()).byteLength }
+    }, `${base}/api/rooms/${code}/export`)
+    check('the host can download the room', exported.type.includes('gzip') && exported.bytes > 20, JSON.stringify(exported))
+  })
 
-  host.on('dialog', dialog => dialog.accept())
-  await host.click('.menu button.ghost')
-  await host.click('.menu-row:has-text("sam") button:text("remove")')
-  await guest.waitForSelector('.term', { timeout: 6000 })
-  check('a kicked guest is put back on the landing page', (await guest.textContent('.term-body')).includes('removed'))
+  await section('kicking a guest', async () => {
+    host.on('dialog', dialog => dialog.accept())
+    await host.click('.menu button.ghost')
+    await host.click('.menu-row:has-text("sam") button:text("remove")')
+    await guest.waitForSelector('.term', { timeout: 6000 })
+    check('a kicked guest is put back on the landing page', (await guest.textContent('.term-body')).includes('removed'))
+  })
 
   // A visitor on their own should get something to poke at, not an empty tree.
-  await openDemo(guest, 'solo')
-  await guest.waitForSelector('.cm-line', { timeout: 20_000 })
-  check('a demo room lands on the notes file', (await guest.locator('.file-tab').textContent()).includes('src/notes.md'))
-  await audit(guest, 'a room')
+  await section('the demo room', async () => {
+    await openDemo(guest, 'solo')
+    await guest.waitForSelector('.cm-line', { timeout: 20_000 })
+    check('a demo room lands on the notes file', (await guest.locator('.file-tab').textContent()).includes('src/notes.md'))
+    await audit(guest, 'a room')
+  })
   check('no page errors', errors.length === 0, errors.join(' | ').slice(0, 120))
 } catch (problem) {
   check(`flow aborted: ${problem.message.slice(0, 100)}`, false)
@@ -215,7 +256,6 @@ try {
   await browser.close()
   server.kill()
   // Room containers are detached, so the test has to clear its own.
-  const { execFileSync } = await import('node:child_process')
   try {
     const names = execFileSync('docker', ['ps', '--filter', 'name=climp-room-', '--format', '{{.Names}}']).toString()
     for (const name of names.split('\n').map(line => line.trim()).filter(Boolean)) execFileSync('docker', ['rm', '-f', name], { stdio: 'ignore' })

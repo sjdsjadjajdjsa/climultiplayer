@@ -13,7 +13,7 @@
     "test": "npm run test --workspace server",
     "typecheck": "npm run typecheck --workspace server && npm run typecheck --workspace web",
     "host": "npm run build && node server/dist/server.js --lan",
-    "room:image": "docker build -f Dockerfile.room -t climultiplayer-room:latest .",
+    "room:image": "docker build -f Dockerfile.room -t climultiplayer-room:latest . || docker build --network host -f Dockerfile.room -t climultiplayer-room:latest .",
     "serve": "node server/dist/server.js",
     "test:ui": "npm run build && node test/ui.mjs",
     "test:audit": "npm run build && node test/audit.mjs",
