@@ -195,3 +195,13 @@ export const closeFileSockets = (code: string, path: string) => {
   state.awareness.destroy()
   byFile.delete(id)
 }
+
+// Deleting a room must hang up every file it had open, or those sockets keep
+// syncing against a destroyed document.
+export const closeRoomFileSockets = (code: string) => {
+  for (const id of [...byFile.keys()]) {
+    const cut = id.indexOf('\u0000')
+    if (cut < 0 || id.slice(0, cut) !== code) continue
+    closeFileSockets(code, id.slice(cut + 1))
+  }
+}

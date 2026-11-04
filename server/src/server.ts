@@ -15,7 +15,7 @@ import { deletePage, listPages, publishPage, readPageFile } from './pages.js'
 import { clearedCookie, cookieHeader, cookieSession, requestToken } from './session.js'
 import { storeFor } from './auth/registry.js'
 import { SUBSCRIPTIONS, subscriptionById } from './auth/subs.js'
-import { closeFileSockets, docRoutes, kickFileSockets } from './ws.js'
+import { closeFileSockets, closeRoomFileSockets, docRoutes, kickFileSockets } from './ws.js'
 import { broadcastJoins, closeControl, controlRoutes, kickSockets, notifyPreviews, notifyTree, refreshPresence } from './control.js'
 import { findPreview, listPreviews, mintTicket, previewBase, startPreview, startPreviewGateway, stopMemberPreviews, stopPreview, stopRoomPreviews } from './previews.js'
 import {
@@ -24,6 +24,7 @@ import {
   type Member, type Room,
 } from './rooms.js'
 import { closeDoc, closeRoomDocs, flushAll, flushRoomDocs } from './docs.js'
+import { closeRoomSessions } from './sessions.js'
 import {
   deleteWorkspacePath, listTree, readWorkspaceFile, writeWorkspaceFile, WorkspaceError,
 } from './workspace.js'
@@ -40,6 +41,18 @@ const setSession = (req: any, reply: any, code: string, token: string) => {
 
 const clearSession = (reply: any) => {
   reply.header('set-cookie', clearedCookie)
+}
+
+// One teardown for both ways a room dies (host deletes it, or the idle sweep
+// finds it). Two paths that each remember half the steps are how sockets,
+// docs and terminals leak.
+const teardownRoom = async (room: Room) => {
+  stopRoomPreviews(room.code)
+  closeControl(room.code)
+  closeRoomFileSockets(room.code)
+  closeRoomSessions(room.code)
+  await closeRoomDocs(room.code)
+  await deleteRoom(room)
 }
 
 const memberOf = (req: any): { room: Room; member: Member } | null => {
@@ -260,10 +273,7 @@ export const buildServer = async () => {
   app.delete('/api/rooms/:code', async (req, reply) => {
     const found = requireHost(req, reply)
     if (!found) return
-    stopRoomPreviews(found.room.code)
-    closeControl(found.room.code)
-    await closeRoomDocs(found.room.code)
-    await deleteRoom(found.room)
+    await teardownRoom(found.room)
     clearSession(reply)
     return reply.send({ ok: true })
   })
@@ -570,7 +580,7 @@ export const startServer = async () => {
   await loadRooms()
   const reaped = await reapOrphanContainers(allRooms().map(room => room.code))
   if (reaped) console.log(`removed ${reaped} shell container(s) left by an earlier run`)
-  setInterval(() => void sweepRooms(), 60_000).unref()
+  setInterval(() => void sweepRooms(teardownRoom), 60_000).unref()
   // A stray rejection should not take the room down silently; a truly uncaught
   // exception is logged and the process exits so compose can restart it.
   process.on('unhandledRejection', reason => console.error('unhandled rejection:', reason))

@@ -492,11 +492,13 @@ export const loadRooms = async () => {
   }
 }
 
-export const sweepRooms = async () => {
+// The sweep cannot reach the socket and terminal teardown in server.ts, so the
+// caller hands it the full teardown; bare deleteRoom would leak them.
+export const sweepRooms = async (teardown: (room: Room) => Promise<void> = deleteRoom) => {
   const cutoff = Date.now() - roomIdleMinutes * 60_000
   for (const room of rooms.values()) {
     expireJoins(room)
-    if (room.sockets.size === 0 && room.lastSeen < cutoff) await deleteRoom(room)
+    if (room.sockets.size === 0 && room.lastSeen < cutoff) await teardown(room)
   }
 }
 

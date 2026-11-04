@@ -444,5 +444,12 @@ export const kickSockets = (room: Room, memberId: string) => {
 
 export const closeControl = (roomCode: string) => {
   clients.delete(roomCode)
+  // Approvals would expire on their own after 90s, but a dead room has no one
+  // left to answer them, so clear them with the room.
+  for (const [id, pending] of approvals) {
+    if (pending.room.code !== roomCode) continue
+    clearTimeout(pending.timer)
+    approvals.delete(id)
+  }
   void closeRoomShell(roomCode)
 }

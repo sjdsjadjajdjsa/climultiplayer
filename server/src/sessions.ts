@@ -172,3 +172,17 @@ export const kickSessions = (code: string, memberId: string) => {
     if (session.memberId === memberId) closeSession(session)
   }
 }
+
+// Room teardown kills every member terminal at once; waiting out the 60s
+// expiry would pin ptys (real processes on the host shell) past the room.
+export const closeRoomSessions = (code: string) => {
+  const map = byRoom.get(code)
+  if (!map) return
+  for (const session of map.values()) {
+    closeSession(session)
+    if (session.expiry) clearTimeout(session.expiry)
+    emit(session, { type: 'term:end', id: session.id })
+  }
+  byRoom.delete(code)
+  changed?.(code)
+}
