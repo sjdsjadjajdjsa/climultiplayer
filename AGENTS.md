@@ -96,11 +96,16 @@ behaviour.
 
 - `main` carries the security pass (per-member containers and homes, host-only
   room creation, origin check, sandboxed pages, symlink refusal, owner-only
-  credential files) and live previews (a second gateway port with single-use
-  tickets, cookie stripping, membership checked per request).
+  credential files), a second pass on top (tokens persist as hashes, CSP
+  headers, per-member terminal and join-request caps, control-character
+  rejection in the shared shell) and live previews (a second gateway port with
+  single-use tickets, cookie stripping, membership checked per request).
 - Test commands run the container path when the image exists and fall back to a
-  host shell otherwise; `CLIMP_SHELL=docker` forces it in CI.
+  host shell otherwise; CI builds the image and runs both vitest and the
+  two-browser `test/ui.mjs` suite in docker mode.
 - Shells need docker for guests. Host mode is host-only on purpose, not a bug.
+- `npm run room:image` retries once with host networking, so a VPN-blocked
+  docker bridge no longer fails the build outright.
 - `CLIMP_ROOM_NETWORK=host` needs `CLIMP_ALLOW_HOST_NETWORK=1`; previews under
   host networking are the host's own ports, so one room per port.
 
