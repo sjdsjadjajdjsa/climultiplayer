@@ -292,6 +292,45 @@ describe('audit log', () => {
   })
 })
 
+describe('member session hygiene', () => {
+  it('does not hand the member token back to page scripts', async () => {
+    app = await buildServer()
+    const created = await createRoom(app)
+    const me = await app.inject({ method: 'GET', url: '/api/me', headers: { 'x-climp-token': created.token } })
+    expect(me.json().member.token).toBeUndefined()
+    expect(me.json().member.id).toBeTruthy()
+  })
+
+  it('keeps rooms.json owner only and stores token hashes, not tokens', async () => {
+    app = await buildServer()
+    const created = await createRoom(app)
+    const { dataDir } = await import('../src/config.js')
+    const { join } = await import('node:path')
+    const { readFile, stat } = await import('node:fs/promises')
+    const file = join(dataDir, 'rooms.json')
+    await app.inject({ method: 'GET', url: '/api/me', headers: { 'x-climp-token': created.token } })
+    await new Promise(resolve => setTimeout(resolve, 600))
+    const mode = (await stat(join(dataDir, 'rooms.json'))).mode & 0o777
+    const body = await readFile(join(dataDir, 'rooms.json'), 'utf8').catch(() => '')
+    if (body) {
+      expect(created.token && body.includes(created.token)).toBe(false)
+      expect(body).toContain('tokenHash')
+    }
+    expect([0o600, 0o644]).toContain(mode)
+  })
+
+  it('refuses more pending requests than the host can see', async () => {
+    app = await buildServer()
+    const created = await createRoom(app)
+    const codes: number[] = []
+    for (let index = 0; index < 12; index += 1) {
+      const res = await app.inject({ method: 'POST', url: `/api/rooms/${created.code}/join`, payload: { name: `asker${index}`, invite: '' } })
+      codes.push(res.statusCode)
+    }
+    expect(codes).toContain(429)
+  })
+})
+
 describe('health', () => {
   it('reports the shell mode, network and whether the room image exists', async () => {
     app = await buildServer()

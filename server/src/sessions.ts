@@ -73,6 +73,10 @@ export const startSession = async (
   member: { id: string; name: string; color: string },
   owner: WebSocket,
 ) => {
+  // Every terminal is a pty plus a docker exec on the host; one member should
+  // not be able to hold dozens of them.
+  const mine = [...sessionMap(code).values()].filter(session => session.memberId === member.id).length
+  if (mine >= 4) throw new Error('you already have four terminals open. close one first')
   await ensureRoomContainer(code, workspace, member.id)
   const home = await ensureHome(code, member.id)
   const plan = execPlan(code, member.id, home)

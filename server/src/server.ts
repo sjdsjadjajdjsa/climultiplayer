@@ -19,7 +19,7 @@ import { closeFileSockets, docRoutes, kickFileSockets } from './ws.js'
 import { broadcastJoins, closeControl, controlRoutes, kickSockets, notifyPreviews, notifyTree, refreshPresence } from './control.js'
 import { findPreview, listPreviews, mintTicket, previewBase, startPreview, startPreviewGateway, stopMemberPreviews, stopPreview, stopRoomPreviews } from './previews.js'
 import {
-  allMembers, allRooms, createInvite, createRoom, decideJoin, removeMember, seedDemo, setRole, deleteRoom, expireJoins, findByToken, findJoin, findMember, getRoom,
+  allMembers, allRooms, createInvite, createRoom, decideJoin, publicMember, removeMember, seedDemo, setRole, deleteRoom, expireJoins, findByToken, findJoin, findMember, getRoom,
   hashToken, inviteLifetimeMinutes, loadRooms, publicInvite, publicRoom, requestJoin, revokeInvite, RoomError, sweepRooms,
   type Member, type Room,
 } from './rooms.js'
@@ -126,7 +126,22 @@ export const buildServer = async () => {
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-content-type-options', 'nosniff')
     reply.header('referrer-policy', 'no-referrer')
-    if (!req.url.startsWith('/p/')) reply.header('x-frame-options', 'DENY')
+    if (req.url.startsWith('/p/')) return
+    reply.header('x-frame-options', 'DENY')
+    reply.header('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=()')
+    // The app is the only thing that should run here; published pages are
+    // sandboxed separately and never get this policy.
+    reply.header('content-security-policy', [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self'",
+      "connect-src 'self' ws: wss:",
+      "frame-ancestors 'none'",
+      "base-uri 'none'",
+      "form-action 'self'",
+    ].join('; '))
   })
   await app.register(websocket, { options: { maxPayload: 8 * 1024 * 1024 } })
   docRoutes(app)
@@ -154,7 +169,7 @@ export const buildServer = async () => {
   app.get('/api/me', async (req, reply) => {
     const found = memberOf(req)
     if (!found) return reply.send({ code: null, member: null })
-    return reply.send({ code: found.room.code, member: { ...found.member, online: true } })
+    return reply.send({ code: found.room.code, member: { ...publicMember(found.member), online: true } })
   })
 
   app.post('/api/leave', async (req, reply) => {
@@ -274,7 +289,7 @@ export const buildServer = async () => {
     const member = await removeMember(found.room, memberId)
     if (!member) return reply.code(404).send({ error: 'no such member' })
     kickSockets(found.room, memberId)
-    kickFileSockets(member.token)
+    kickFileSockets(member.id)
     void removeMemberContainer(found.room.code, memberId)
     stopMemberPreviews(found.room.code, memberId)
     notifyPreviews(found.room, listPreviews(found.room.code))
@@ -556,6 +571,13 @@ export const startServer = async () => {
   const reaped = await reapOrphanContainers(allRooms().map(room => room.code))
   if (reaped) console.log(`removed ${reaped} shell container(s) left by an earlier run`)
   setInterval(() => void sweepRooms(), 60_000).unref()
+  // A stray rejection should not take the room down silently; a truly uncaught
+  // exception is logged and the process exits so compose can restart it.
+  process.on('unhandledRejection', reason => console.error('unhandled rejection:', reason))
+  process.on('uncaughtException', error => {
+    console.error('uncaught exception:', error)
+    process.exit(1)
+  })
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, async () => {
       await flushAll()

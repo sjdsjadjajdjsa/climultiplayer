@@ -71,6 +71,8 @@ export const containerRunArgs = (code: string, workspace: string, owner = 'share
   '--user', uid(),
   '-e', 'TERM=xterm-256color',
   '--memory', roomMemory,
+  // Without an explicit swap limit the container may swap to twice its memory.
+  '--memory-swap', roomMemory,
   '--cpus', roomCpus,
   '--pids-limit', String(roomPids),
   '--ulimit', 'nofile=1024:2048',

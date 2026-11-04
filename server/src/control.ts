@@ -291,6 +291,12 @@ const RUN_MAX = 8
 const runShell = async (client: Client, room: Room, raw: string) => {
   const command = raw.trim()
   if (!command) return
+  // A newline or a control character would break out of the one-line check and
+  // could interrupt or close the shared shell for everyone (Ctrl-C, Ctrl-D).
+  if (/[\u0000-\u001f\u007f]/.test(command)) {
+    sendTo(client.socket, { type: 'notice', level: 'error', message: 'a command cannot contain control characters or line breaks' })
+    return
+  }
   const now = Date.now()
   client.runs = client.runs.filter(at => now - at < RUN_WINDOW_MS)
   if (client.runs.length >= RUN_MAX) {

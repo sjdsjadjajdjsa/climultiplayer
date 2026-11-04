@@ -161,6 +161,32 @@ describe('room socket', () => {
     guest.socket.close()
   })
 
+  it('refuses control characters, which would break out of the one line', async () => {
+    const { code, hostToken } = await start()
+    const host = connect(code, hostToken)
+    await host.open
+    await waitFor(host.messages, message => message.type === 'hello')
+    host.socket.send(JSON.stringify({ type: 'term:run', command: 'echo one\u0004' }))
+    const notice = await waitFor(host.messages, message => message.type === 'notice')
+    expect(notice.message).toMatch(/control characters/)
+    expect(host.messages.some(message => message.type === 'term:run')).toBe(false)
+    host.socket.close()
+  })
+
+  it('caps a member at four terminals', async () => {
+    const { code, hostToken } = await start()
+    const host = connect(code, hostToken)
+    await host.open
+    await waitFor(host.messages, message => message.type === 'hello')
+    for (let index = 0; index < 5; index += 1) {
+      host.socket.send(JSON.stringify({ type: 'term:open' }))
+      await new Promise(resolve => setTimeout(resolve, 1500))
+    }
+    const notice = await waitFor(host.messages, message => message.type === 'notice', 8000)
+    expect(notice.message).toMatch(/four terminals/)
+    host.socket.close()
+  }, 30_000)
+
   it('slows down a member who floods the shell', async () => {
     const { code, hostToken } = await start()
     const host = connect(code, hostToken)

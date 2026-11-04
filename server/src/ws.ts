@@ -88,7 +88,8 @@ export const docRoutes = (app: FastifyInstance) => {
       socket.close(4404, 'no such room')
       return
     }
-    if (!findMember(room, token)) {
+    const member = findMember(room, token)
+    if (!member) {
       socket.close(4401, 'not a member of this room')
       return
     }
@@ -97,7 +98,7 @@ export const docRoutes = (app: FastifyInstance) => {
       return
     }
 
-    ;(socket as any).__member = String((req.query as Record<string, string>)?.member ?? '') || token
+    ;(socket as any).__member = member.id
     // A client greets the server the moment the socket opens, which can be before
     // the document has loaded. Those first frames are held, not dropped; a lost
     // greeting means the client never finishes syncing.

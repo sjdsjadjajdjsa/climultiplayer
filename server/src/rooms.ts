@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { customAlphabet } from 'nanoid'
 import type { WebSocket } from 'ws'
@@ -16,7 +16,9 @@ export type Role = 'host' | 'guest' | 'editor'
 export type Member = {
   id: string
   name: string
+  // The raw token lives in memory only; the file keeps the hash, like invites.
   token: string
+  tokenHash: string
   role: Role
   color: string
   online: number
@@ -111,15 +113,19 @@ const cleanName = (name: string) => {
   return text || 'anonymous'
 }
 
-export const createMember = (name: string, role: Role): Member => ({
-  id: makeToken().slice(0, 12),
-  name: cleanName(name),
-  token: makeToken(),
-  role,
-  color: pickColor(),
-  online: 0,
-  joinedAt: Date.now(),
-})
+export const createMember = (name: string, role: Role): Member => {
+  const token = makeToken()
+  return {
+    id: makeToken().slice(0, 12),
+    name: cleanName(name),
+    token,
+    tokenHash: hashToken(token),
+    role,
+    color: pickColor(),
+    online: 0,
+    joinedAt: Date.now(),
+  }
+}
 
 export const createInvite = (room: Room, minutes = inviteLifetimeMinutes) => {
   const token = newInviteToken()
@@ -278,7 +284,9 @@ export const getRoom = (code: string) => {
 export const peekRoom = (code: string) => rooms.get(String(code ?? '').toUpperCase())
 
 export const findMember = (room: Room, token: string) => {
-  for (const member of room.members.values()) if (member.token === token) return member
+  if (!token) return null
+  const hash = hashToken(token)
+  for (const member of room.members.values()) if (member.tokenHash === hash) return member
   return null
 }
 
@@ -315,6 +323,9 @@ export const requestJoin = (code: string, name: string, inviteInput: string) => 
     }
   }
   if (room.members.size >= 32) throw new RoomError('the room is full', 409)
+  // A stranger who knows the code could otherwise bury the host in cards.
+  const pending = [...room.joins.values()].filter(existing => existing.status === 'pending' && existing.expiresAt > Date.now()).length
+  if (pending >= 8) throw new RoomError('too many requests are already waiting for the host', 429)
   const token = newInviteToken()
   const request: JoinRequest = {
     id: makeToken().slice(0, 10),
@@ -434,12 +445,15 @@ const persist = async () => {
       createdAt: room.createdAt,
       lastSeen: room.lastSeen,
       hostId: room.hostId,
-      members: [...room.members.values()],
+      members: [...room.members.values()].map(member => ({ ...member, token: '' })),
       invites: [...room.invites.values()],
       joins: [...room.joins.values()].filter(request => request.status === 'pending' || Date.now() - request.createdAt < 3_600_000),
     }))
-    await mkdir(dataDir, { recursive: true })
-    await writeFile(roomsFile(), JSON.stringify(snapshot, null, 2))
+    // Member tokens are as good as a session, so the file is owner only and
+    // stores hashes, not the tokens themselves.
+    await mkdir(dataDir, { recursive: true, mode: 0o700 })
+    await writeFile(roomsFile(), JSON.stringify(snapshot, null, 2), { mode: 0o600 })
+    await chmod(roomsFile(), 0o600).catch(() => {})
   }, 300)
   saveTimer.unref?.()
 }
@@ -457,8 +471,9 @@ export const loadRooms = async () => {
     if (!Array.isArray(entry.members) || !entry.hostId) continue
     const members = new Map<string, Member>()
     for (const member of entry.members) {
-      if (!member?.token) continue
-      members.set(member.id, { ...member, online: 0 })
+      const tokenHash = member?.tokenHash ?? (member?.token ? hashToken(member.token) : '')
+      if (!member?.id || !tokenHash) continue
+      members.set(member.id, { ...member, token: '', tokenHash, online: 0 })
     }
     if (!members.has(entry.hostId)) continue
     rooms.set(entry.code, {
