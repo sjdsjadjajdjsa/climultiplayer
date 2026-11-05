@@ -44,6 +44,18 @@ around on your own. `start` makes an empty room, and `start /path/to/folder` mak
 one from a copy of a folder (your original is never touched). Each of those is
 also a button under the prompt. Stop the server with `Ctrl+C`.
 
+**Don't want to clone and build?** The server ships as a prebuilt image:
+
+```bash
+docker run -p 8787:8787 -v climpdata:/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/sjdsjadjajdjsa/climultiplayer:latest
+```
+
+The socket mount is what lets the server start each room's throwaway shell
+container on your Docker. You still need `npm run room:image` once for the
+shell image, or set `CLIMP_SHELL=host` to skip containers entirely.
+
 To bring friends in, see [Host it for friends](#host-it-for-friends).
 
 **If something goes wrong**
