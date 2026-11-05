@@ -24,6 +24,9 @@ export const ignoredSuffixes = ['.pyc', '.png', '.jpg', '.jpeg', '.gif', '.webp'
 // workspace is mounted, no host home directory, capped CPU and memory.
 export const shellMode = process.env.CLIMP_SHELL ?? 'auto'
 export const roomImage = process.env.CLIMP_ROOM_IMAGE ?? 'climultiplayer-room:latest'
+// The ready-made room image, published by .github/workflows/publish.yml. A fresh
+// install pulls this once instead of building it, so one `docker run` is enough.
+export const roomImagePull = process.env.CLIMP_ROOM_IMAGE_PULL ?? 'ghcr.io/sjdsjadjajdjsa/climultiplayer-room:latest'
 export const roomMemory = process.env.CLIMP_ROOM_MEMORY ?? '1g'
 export const roomCpus = process.env.CLIMP_ROOM_CPUS ?? '1'
 export const roomNetwork = process.env.CLIMP_ROOM_NETWORK ?? 'bridge'

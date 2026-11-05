@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { dataDir, previewPorts, roomCpus, roomImage, roomMemory, roomNetwork, roomPids, shellMode } from './config.js'
+import { dataDir, previewPorts, roomCpus, roomImage, roomImagePull, roomMemory, roomNetwork, roomPids, shellMode } from './config.js'
 
 // One container for the shared shell, and one per member for their own
 // terminals and tools. Members share the workspace, never a home: a home holds
@@ -25,7 +25,8 @@ const uid = () => (typeof process.getuid === 'function' ? `${process.getuid()}:$
 
 const docker = (args: string[], timeout = 15_000) =>
   new Promise<{ code: number; stdout: string }>((resolve) => {
-    execFile('docker', args, { timeout }, (error: any, stdout) => resolve({ code: error ? Number(error.code) || 1 : 0, stdout: String(stdout ?? '') }))
+    // A pull prints a lot of progress; the default 1 MB cap would fail it with ENOBUFS.
+    execFile('docker', args, { timeout, maxBuffer: 8 * 1024 * 1024 }, (error: any, stdout) => resolve({ code: error ? Number(error.code) || 1 : 0, stdout: String(stdout ?? '') }))
   })
 
 // A VPN on the host often kills the docker bridge while the host itself still
@@ -34,7 +35,7 @@ const docker = (args: string[], timeout = 15_000) =>
 export const bridgeEgress = async () => {
   if (!useDocker() || roomNetwork !== 'bridge' || networkRefusal()) return true
   const probe = await docker([
-    'run', '--rm', '--network', 'bridge', roomImage,
+    'run', '--rm', '--network', 'bridge', imageName,
     'node', '-e', "fetch('https://registry.npmjs.org', { signal: AbortSignal.timeout(2500) }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
   ], 12_000)
   return probe.code === 0
@@ -42,15 +43,71 @@ export const bridgeEgress = async () => {
 
 // Whether the room image exists. Without it every room shell fails to start, so
 // the landing page and the startup banner say so instead of leaving it a mystery.
+// A fresh install has no local build, so the published image is accepted too and
+// everything downstream runs against whichever one is actually present.
 let imageChecked = 0
 let imageOk = true
+let imageName = roomImage
+let pulling: Promise<boolean> | null = null
+
+const hasImage = async (name: string) => (await docker(['image', 'inspect', name], 8_000)).code === 0
+
+// The name the room containers should run. Falls back to the published tag when
+// the user never built one locally.
+export const roomImageInUse = () => imageName
+export const roomImagePulling = () => pulling !== null
+
+const resolveImage = async () => {
+  if (await hasImage(roomImage)) {
+    imageName = roomImage
+    return true
+  }
+  if (roomImage === roomImagePull) return false
+  if (await hasImage(roomImagePull)) {
+    imageName = roomImagePull
+    return true
+  }
+  return false
+}
+
 export const roomImageReady = async () => {
   if (!useDocker()) return true
   if (Date.now() - imageChecked < 10_000) return imageOk
-  const found = await docker(['image', 'inspect', roomImage], 8_000)
-  imageOk = found.code === 0
+  imageOk = await resolveImage()
   imageChecked = Date.now()
   return imageOk
+}
+
+// Pull the published room image when nothing local matches, once. Building it by
+// hand was the last step between `docker run` and a working room, and the failure
+// it caused (a room that silently will not start) is the one people report as a bug.
+export const ensureRoomImage = async (log: (line: string) => void = () => {}) => {
+  if (!useDocker()) return true
+  if (await resolveImage()) {
+    imageOk = true
+    imageChecked = Date.now()
+    return true
+  }
+  if (pulling) return pulling
+  log(`room image not found, pulling ${roomImagePull} (about 900 MB, once)`)
+  pulling = docker(['pull', roomImagePull], 900_000).then(async result => {
+    pulling = null
+    const pulled = result.code === 0 || (await hasImage(roomImagePull))
+    if (!pulled) {
+      const detail = result.stdout.trim().split('\n').slice(-3).join(' ').slice(0, 300)
+      log(`could not pull the room image: ${detail}`)
+      log('  build it instead: npm run room:image')
+      imageOk = false
+      imageChecked = Date.now()
+      return false
+    }
+    imageName = roomImagePull
+    imageOk = true
+    imageChecked = Date.now()
+    log(`room image ready: ${roomImagePull}`)
+    return true
+  })
+  return pulling
 }
 
 // Host networking hands a guest the host's loopback: this server's own API,
@@ -87,7 +144,7 @@ export const containerRunArgs = (code: string, workspace: string, owner = 'share
   '-v', `${workspace}:/workspace`,
   '-v', `${join(homesDir(code), safeOwner(owner))}:/homes/${safeOwner(owner)}`,
   '-w', '/workspace',
-  roomImage,
+  imageName,
   'sleep', 'infinity',
 ]
 
@@ -99,6 +156,9 @@ export const ensureRoomContainer = async (code: string, workspace: string, owner
   if (!useDocker()) return null
   const refused = networkRefusal()
   if (refused) throw new Error(refused)
+  // On a fresh install the first room waits here while the published image
+  // pulls, rather than dying with docker's "image not found".
+  if (!(await ensureRoomImage())) throw new Error('the room image is missing and could not be pulled. Build it once: npm run room:image')
   const name = containerName(code, owner)
   const running = await docker(['inspect', '-f', '{{.State.Running}}', name])
   if (running.code === 0 && running.stdout.trim() === 'true') return name

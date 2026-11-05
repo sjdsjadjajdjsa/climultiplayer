@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 import { host, lan, port, dataDir, previewPort, roomNetwork, webDir } from './config.js'
 import { shareLinks } from './addresses.js'
 import { reapOrphanContainers, useDocker } from './shell.js'
-import { bridgeEgress, memberPath, networkRefusal, removeMemberContainer, roomImageReady } from './container.js'
+import { bridgeEgress, ensureRoomImage, memberPath, networkRefusal, removeMemberContainer, roomImagePulling, roomImageReady } from './container.js'
 import { hasBin, installTool, TOOLS, toolById } from './tools.js'
 import { deletePage, listPages, publishPage, readPageFile } from './pages.js'
 import { clearedCookie, cookieHeader, cookieSession, requestToken } from './session.js'
@@ -160,7 +160,7 @@ export const buildServer = async () => {
   docRoutes(app)
   controlRoutes(app)
 
-  app.get('/api/health', async () => ({ ok: true, shell: useDocker() ? 'container' : 'host', network: useDocker() ? roomNetwork : 'host', image: await roomImageReady() }))
+  app.get('/api/health', async () => ({ ok: true, shell: useDocker() ? 'container' : 'host', network: useDocker() ? roomNetwork : 'host', image: await roomImageReady(), pulling: roomImagePulling() }))
 
   app.post('/api/rooms', async (req, reply) => {
     // Anyone who can reach the server could otherwise start a room, get a shell
@@ -607,16 +607,18 @@ export const startServer = async () => {
     console.log('  warning: shells run as this user with no container. Guests can reach your home directory.')
   }
   if (useDocker()) {
-    void roomImageReady().then(ready => {
-      if (!ready) console.log('  warning: the room image is not built, so room shells will not start.\n  build it once: npm run room:image')
+    // The image is pulled here, once, so a fresh install needs no build step. The
+    // egress probe waits for it: probing with a missing image reports a VPN fault
+    // that is not there.
+    void ensureRoomImage(line => console.log(`  ${line}`)).then(ready => {
+      if (!ready) console.log('  warning: the room image is missing, so room shells will not start.\n  build it once: npm run room:image')
+      if (!ready) return
+      void bridgeEgress().then(ok => {
+        if (!ok) console.log('  warning: room containers cannot reach the network over the docker bridge (a VPN often blocks it).\n  run with CLIMP_ROOM_NETWORK=host so installs and fetches work.')
+      })
     })
   }
   if (useDocker() && networkRefusal()) console.log(`  warning: ${networkRefusal()}\n  room shells will not start until that changes.`)
-  if (useDocker()) {
-    void bridgeEgress().then(ok => {
-      if (!ok) console.log('  warning: room containers cannot reach the network over the docker bridge (a VPN often blocks it).\n  run with CLIMP_ROOM_NETWORK=host so installs and fetches work.')
-    })
-  }
   if (host === '0.0.0.0' || host === '::') {
     console.log(`climultiplayer on http://127.0.0.1:${port} (local)`)
     for (const link of shareLinks(port)) console.log(`  on your network: ${link}`)
