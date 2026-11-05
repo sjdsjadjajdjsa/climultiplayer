@@ -339,6 +339,7 @@ describe('health', () => {
     expect(body.ok).toBe(true)
     expect(['container', 'host']).toContain(body.shell)
     expect(typeof body.image).toBe('boolean')
+    expect(typeof body.pulling).toBe('boolean')
   })
 })
 

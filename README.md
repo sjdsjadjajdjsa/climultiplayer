@@ -34,7 +34,7 @@ You need three things installed:
 git clone https://github.com/sjdsjadjajdjsa/climultiplayer
 cd climultiplayer
 npm install
-npm run room:image   # once: builds the shell image, about 870 MB, a few minutes
+npm run room:image   # optional: builds the shell image locally instead of pulling it, about 870 MB
 npm run doctor       # checks the above and tells you exactly what to fix
 npm start
 ```
@@ -53,8 +53,10 @@ docker run -p 8787:8787 -v climpdata:/data \
 ```
 
 The socket mount is what lets the server start each room's throwaway shell
-container on your Docker. You still need `npm run room:image` once for the
-shell image, or set `CLIMP_SHELL=host` to skip containers entirely.
+container on your Docker. On first start it pulls the shell image (about 900 MB,
+once) and reuses it from then on, so there is no build step. Build it yourself
+instead with `npm run room:image`, or set `CLIMP_SHELL=host` to skip containers
+entirely.
 
 To bring friends in, see [Host it for friends](#host-it-for-friends).
 
@@ -63,7 +65,7 @@ To bring friends in, see [Host it for friends](#host-it-for-friends).
 | What you see | What to do |
 |---|---|
 | `docker: command not found`, or "docker is not running" | Install Docker, or start it, then run `npm run doctor` again |
-| The landing page says the room image is not built | `npm run room:image` |
+| The landing page says the room image is missing | The first pull failed. Retry with `docker pull ghcr.io/sjdsjadjajdjsa/climultiplayer-room:latest`, or build it: `npm run room:image` |
 | The image build fails at `apt-get` (often a VPN) | `npm run room:image` retries once with host networking on its own; if it still fails, disconnect the VPN and run it again |
 | Installs in a room hang, or the image build stalls (often a VPN) | The docker bridge is blocked. Run `CLIMP_ROOM_NETWORK=host CLIMP_ALLOW_HOST_NETWORK=1 npm start`. Guests can then reach your machine's loopback, so only do this with people you trust |
 | `address already in use` | Another copy is running. `PORT=8790 npm start`, or stop the other one |
