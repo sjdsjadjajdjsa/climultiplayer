@@ -64,6 +64,31 @@ startup banner says so.
 - What a preview shows is whatever the dev server serves. Treat it like any web
   page a friend wrote: it can ask you for things.
 
+## Sessions, invites and limits
+
+- Sessions are an HttpOnly, SameSite=Strict cookie, `Secure` behind TLS. No
+  token sits in localStorage, websocket URLs or logs.
+- Cross-site requests and websocket upgrades need a matching `Origin`, and rooms
+  cannot be started from off the machine unless `CLIMP_OPEN_ROOMS=1` is set.
+- Join attempts are limited to 20 per minute per address and room. A denied
+  request does not spend the invite.
+- Shell input is limited to 8 commands per 5 seconds per member, and the
+  assistant to one answer at a time, so nobody can bury the room or drain a
+  plan.
+- The host can remove anyone, and a removed member needs a fresh invite.
+- The room download leaves `.git` out: hooks and `core.fsmonitor` in a
+  guest-made repository would run on your machine.
+
+## Known limits
+
+- Approvals are a heuristic, not a sandbox. The container is the boundary.
+- A host-mode shell can reach your home directory.
+- Anyone holding an open invite can ask to join; the host still has to allow it.
+- Container network access is on by default so installs work.
+- Binary files are read as UTF-8; the editor is for text.
+- There is no git integration and no per-file locking. Concurrent edits merge
+  through the CRDT rather than through patch review.
+
 ## Reporting
 
 Open an issue with the version, the mode in the startup banner, and the smallest

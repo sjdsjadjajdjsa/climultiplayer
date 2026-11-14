@@ -38,8 +38,9 @@ through playwright and are the only coverage of the docker path.
 | `web/src/Workspace.tsx` | the room UI and websocket client |
 | `server/test/` | vitest; `test/*.mjs` | end-to-end scripts |
 
-`README.md` carries the user-facing story and limits. Keep it in step with
-behaviour.
+`README.md` is the short pitch and quick start. The detail lives in `docs/`
+(`guide.md`, `hosting.md`, `configuration.md`, `architecture.md`) and the limits
+in `SECURITY.md`. Keep them in step with behaviour.
 
 ## Non-obvious behaviour
 
