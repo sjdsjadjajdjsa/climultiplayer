@@ -81,7 +81,16 @@ export const roomImageReady = async () => {
 // Pull the published room image when nothing local matches, once. Building it by
 // hand was the last step between `docker run` and a working room, and the failure
 // it caused (a room that silently will not start) is the one people report as a bug.
-export const ensureRoomImage = async (log: (line: string) => void = () => {}) => {
+// Callers that arrive together share one attempt. Checking `pulling` alone is
+// not enough: a quick pull can finish while a second caller is still inspecting
+// images, and that caller would then start a pull of its own.
+let ensuring: Promise<boolean> | null = null
+export const ensureRoomImage = (log: (line: string) => void = () => {}) => {
+  ensuring ??= ensureOnce(log).finally(() => { ensuring = null })
+  return ensuring
+}
+
+const ensureOnce = async (log: (line: string) => void) => {
   if (!useDocker()) return true
   if (await resolveImage()) {
     imageOk = true
